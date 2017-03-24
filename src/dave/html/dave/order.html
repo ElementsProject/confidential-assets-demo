@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script src="./jquery-3.1.1.min.js"></script>
+        <script src="./jquery.qrcode.min.js"></script>
+        <script src="./order.js"></script>
+        <title>Order</title>
+        <style>
+            #page {
+                width: 800px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            table {
+                width: 100%;
+            }
+            td {
+                text-align: center;
+				white-space: nowrap;
+            }
+            #amount {
+                font-size: 30pt;
+            }
+            button {
+                width: 600px;
+                font-size: 30pt;
+                border-radius: 20px;
+                border: 1px solid gray;
+                cursor: pointer;
+            }
+            .key {
+                width: 30%;
+                text-align: right;
+                font-size: 12pt;
+            }
+            .value {
+                text-align: left;
+                font-size: 12pt;
+            }
+            #after {
+                display: none;
+            }
+            img {
+                border-radius: 10px;
+            }
+			#uri {
+				width: 45em;
+				border: none;
+				text-align: center;
+			}
+        </style>
+    </head>
+    <body>
+        <div id="page">
+            <div id="before">
+                <table>
+                    <tr><td><img src="./coffee.png"></td></tr>
+                    <tr><td><div id="amount">値段：200 suica&nbsp;ポイント</div></td></tr>
+                    <tr><td><button id="order">注文</button></td></tr>
+                </table>
+            </div>
+            <div id="after">
+                <table>
+                    <tr><td colspan="2"><input id="uri" type="text" readonly></td></tr>
+                    <tr><td colspan="2"><div id="qrcode"></div></td></tr>
+                </table>
+                <table>
+                    <tr><td class="key">Name:</td><td class="value"><div id="name"></div></td></tr>
+                    <tr><td class="key">Address:</td><td class="value"><div id="addr"></div></td></tr>
+                    <tr><td class="key">Asset:</td><td class="value"><div id="asset"></div></td></tr>
+                    <tr><td class="key">Price:</td><td class="value"><div id="price"></div></td></tr>
+                    <tr><td colspan="2"><button id="reset">リセット</button></td></tr>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>
