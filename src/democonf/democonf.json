@@ -1,0 +1,31 @@
+{
+	"alice": {
+		"rpcurl": "http://127.0.0.1:10000/",
+		"rpcuser": "user",
+		"rpcpass": "pass",
+		"listen": ":8000"
+	},
+	"bob": {
+		"rpcurl": "http://127.0.0.1:10010/",
+		"rpcuser": "user",
+		"rpcpass": "pass"
+	},
+	"charlie": {
+		"rpcurl": "http://127.0.0.1:10020/",
+		"rpcuser": "user",
+		"rpcpass": "pass",
+		"listen": ":8020"
+	},
+	"dave": {
+		"rpcurl": "http://127.0.0.1:10030/",
+		"rpcuser": "user",
+		"rpcpass": "pass",
+		"laddr": ":8030",
+		"confidential": false
+	},
+	"fred": {
+		"rpcurl": "http://127.0.0.1:10040/",
+		"rpcuser": "user",
+		"rpcpass": "pass"
+	}
+}
