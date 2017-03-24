@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <script src="./jquery-3.2.0.min.js"></script>
+    <script src="./alice.js"></script>
+    <link rel="stylesheet" href="./alice.css">
+</head>
+
+<body>
+    <div class="page">
+        <div class="logo">サービスロゴ</div>
+        <div id="wallet">
+            <div class="wtitle">＜あなたのWallet残高＞</div>
+            <table class="wallet">
+                <tbody id="winfo">
+                </tbody>
+            </table>
+        </div>
+        <div id="scan">
+            <table>
+                <tbody>
+                    <tr>
+                        <td>QR</td>
+                        <td><button class="sbtn">SCAN</button></td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td>OR</td>
+                    </tr>
+                    <tr>
+                        <td>支払い情報入力</td>
+                        <td><input id="payinfo" type="text"></td>
+                    </tr>
+                </tbody>
+            </table>
+
+        </div>
+        <div id="info">
+            <div class="title">商品情報</div>
+            <table>
+                <tr>
+                    <td>商品</td>
+                    <td>：</td>
+                    <td id="ordername"></td>
+                </tr>
+                <tr>
+                    <td>Price</td>
+                    <td>：</td>
+                    <td><span id="ordercost"></span>&nbsp;<span id="orderasset"></span></td>
+                </tr>
+            </table>
+        </div>
+        <div id="pay">
+            <div class="title">支払い方法</div>
+            <table>
+                <tbody id="exinfo">
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div id="modal-overlay">
+        <div id="modal-content">
+            <table id="modal-confirm">
+                <tr>
+                    <td>支払い</td>
+                </tr>
+                <tr>
+                    <td><br></td>
+                </tr>
+                <tr>
+                    <td>
+                        <span id="bpoint" data-name="mc"></span>&nbsp;<span id="basset" data-name="mc"></span>&nbsp;→&nbsp;<span id="apoint" data-name="mc"></span>&nbsp;<span id="aasset" data-name=""></span>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        手数料：<span id="fpoint" data-name="mc"></span>&nbsp;<span id="fasset" data-name="mc">&nbsp;ポイント
+                    </td>
+                </tr>
+                <tr>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>
+                        合計：<span id="tpoint" data-name="mc"></span>&nbsp;<span id="tasset" data-name="mc">
+                    </td>
+                </tr>
+                <tr>
+                    <td><br></td>
+                </tr>
+                <tr>
+                    <td>
+                        <button id="cbtn" class="cancel">キャンセル</button> &nbsp;
+                        <button id="obtn" class="ok">OK</button>
+                    </td>
+                </tr>
+            </table>
+            <div id="modal-thank">Thank you !</div>
+        </div>
+    </div>
+</body>
+
+</html>
