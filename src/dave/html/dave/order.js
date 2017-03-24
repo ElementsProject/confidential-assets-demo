@@ -2,15 +2,20 @@
 function init() {
     $("#order").click(order);
     $("#reset").click(reset);
+    $("#qrcode").click(copyUri);
 }
 
 function order() {
-    if (confirm("本当に注文してもいいですか？")) {
-        $("#qrcode").empty();
-        $("#addr").empty();
-        $("#price").empty();
-        $("#asset").empty();
-        $.getJSON("/order?item=coffee", function (data) {
+    $("#qrcode").empty();
+    $("#addr").empty();
+    $("#price").empty();
+    $("#asset").empty();
+    $("#uri").val("");
+    var param = {
+        item: "Caramel Macchiato Coffee"
+    };
+    $.getJSON("/order", param)
+        .done(function (data) {
             if (data.result) {
                 console.log(data.uri);
                 let item = {
@@ -23,13 +28,22 @@ function order() {
                 $("#price").text("" + data.price);
                 $("#uri").val(data.uri);
             }
+            $("#before").fadeOut('slow', function () { $("#after").fadeIn('slow'); });
+        })
+        .fail(function (jqXHR, textStatus, errorThrown) {
+            alert("order fail\n" + JSON.stringify(jqXHR) + "\n" + textStatus + "\n" + errorThrown + "\n");
         });
-        $("#before").fadeOut('slow', function(){ $("#after").fadeIn(); });
-    }
 }
 
 function reset() {
-    $("#after").fadeOut('slow', function(){ $("#before").fadeIn(); });
+    if (confirm("注文ページにもどりますか？")) {
+        $("#after").fadeOut('slow', function () { $("#before").fadeIn('slow'); });
+    }
+}
+
+function copyUri() {
+    document.getElementById("uri").select();
+    document.execCommand("copy");
 }
 
 $(init);

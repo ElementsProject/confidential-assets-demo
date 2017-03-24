@@ -1,0 +1,224 @@
+* {
+    margin: 0px;
+    padding: 0px;
+    color: #595757;
+    font-family: fmonospace;
+    font-size: 12pt;
+}
+
+body {
+    background-color: #EFEFEF;
+}
+
+#page {
+    width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#head {
+    text-align: center;
+    padding: 20px 0px;
+}
+
+.store {
+    font-size: 20pt;
+    font-weight: bold;
+    transform: scale(1, 1.4);
+}
+
+.office {
+    font-size: 10pt;
+    font-weight: bold;
+    padding-top: 5px;
+}
+
+#before {
+    width: 500px;
+    height: 560px;
+    background-color: #FFFFFF;
+    text-align: center;
+    border-radius: 10px;
+}
+
+#before img {
+    width: 430px;
+    padding-top: 30px;
+}
+
+#pinfo {
+    position: relative;
+    width: 430px;
+    margin: 0px auto;
+    overflow: hidden;
+    margin-top: 10px;
+}
+
+#pinfo::before {
+    position: absolute;
+    content: '';
+    width: 0px;
+    height: 0px;
+    border: 5px solid #FFFFFF;
+    border-radius: 5px;
+    top: 46px;
+    left: -5px;
+}
+
+#pinfo::after {
+    position: absolute;
+    content: '';
+    width: 0px;
+    height: 0px;
+    border: 5px solid #FFFFFF;
+    border-radius: 5px;
+    top: 46px;
+    right: -5px;
+}
+
+#before table {
+    background-color: #00E6C8;
+    width: 100%;
+    border-radius: 5px;
+}
+
+#before tr {
+    height: 50px;
+}
+
+#before tr.sep td {
+    border-bottom: 1px dashed #FFFFFF;
+}
+
+#before div.key {
+    font-size: 10pt;
+}
+
+#before td.key {
+    text-align: left;
+    padding-left: 20px;
+}
+
+#before td.val {
+    text-align: right;
+    padding-right: 20px;
+}
+
+#before .pname {
+    font-size: 12pt;
+    font-weight: bold;
+}
+
+#before .passet {
+    font-size: 12pt;
+    display: inline-block;
+}
+
+#before .pprice {
+    font-size: 20pt;
+    font-weight: bold;
+    transform: scale(1, 1.4);
+    display: inline-block;
+    padding: 0px 10px;
+}
+
+#before .punit {
+    font-size: 14pt;
+    font-weight: bold;
+    display: inline-block;
+}
+
+#order {
+    margin-top: 40px;
+    background-color: #595757;
+    color: #FFFFFF;
+    width: 225px;
+    height: 44px;
+    border: none;
+    border-radius: 5px;
+    font-size: 12pt;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+}
+
+#after {
+    display: none;
+    width: 500px;
+    height: 560px;
+    background-color: #FFFFFF;
+    text-align: center;
+    border-radius: 10px;
+    padding-top: 30px;
+}
+
+#qrbase {
+    width: 440px;
+    border: 2px solid #595757;
+    margin: 0px auto;
+    border-radius: 10px;
+}
+
+#qrbase .qrtext {
+    font-size: 13pt;
+    font-weight: bold;
+    padding-top: 15px;
+}
+
+#qrcode {
+    padding-top: 30px;
+    padding-bottom: 30px;
+    cursor: pointer;
+}
+
+#addr {
+    max-width: 25em;
+    font-size: 12pt;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+    font-family: monospace;
+    word-break: break-all;
+    margin: 0px auto;
+}
+
+.qrbar {
+    width: 400px;
+    margin: 0px auto;
+    border-bottom: 1px solid #595757;
+    padding-top: 8px;
+    margin-bottom: 30px;
+}
+
+.qrval {
+    margin-bottom: 30px;
+}
+
+#name {
+    font-size: 16pt;
+    font-weight: bold;
+}
+
+#asset {
+    font-size: 16pt;
+    font-weight: bold;
+    display: inline-block;
+}
+
+#price {
+    font-size: 16pt;
+    font-weight: bold;
+    display: inline-block;
+    padding: 0px 10px;
+}
+
+.unit {
+    font-size: 16pt;
+    font-weight: bold;
+    display: inline-block;
+}
+
+#uri {
+    width: 1px;
+    height: 1px;
+    border: none;
+}
