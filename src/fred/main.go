@@ -13,11 +13,12 @@ import (
 	"syscall"
 	"time"
 
+	"democonf"
 	"rpc"
 )
 
 // URL for accessing RPC
-var url string = "http://127.0.0.1:10040"
+var rpcurl string = "http://127.0.0.1:10040"
 
 // ID for accessing RPC
 var rpcuser string = "user"
@@ -25,7 +26,7 @@ var rpcuser string = "user"
 // Password for accessing RPC
 var rpcpass string = "pass"
 
-var rpcClient *rpc.Rpc = rpc.NewRpc(url, rpcuser, rpcpass)
+var rpcClient *rpc.Rpc
 
 var interval = 3 * time.Second
 
@@ -68,9 +69,19 @@ func loop() {
 	}
 }
 
+func loadConf() {
+	conf := democonf.NewDemoConf("fred")
+	rpcurl = conf.GetString("rpcurl", rpcurl)
+	rpcuser = conf.GetString("rpcuser", rpcuser)
+	rpcpass = conf.GetString("rpcpass", rpcpass)
+}
+
 func main() {
 	logger = log.New(os.Stdout, "Fred:", log.LstdFlags+log.Lshortfile)
 	fmt.Println("Fred start")
+
+	loadConf()
+	rpcClient = rpc.NewRpc(rpcurl, rpcuser, rpcpass)
 
 	// signal handling (ctrl + c)
 	sig := make(chan os.Signal)
