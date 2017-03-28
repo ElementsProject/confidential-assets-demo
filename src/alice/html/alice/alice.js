@@ -9,28 +9,30 @@ function init() {
     $("#obtn").click(okpay);
     $("#cbtn").click(cancelpay);
     $("#modal-thank").click(cancelpay);
-    $("#payinfo").change(getPayInfo);
+    $("#addressinput").change(getPayInfo);
+    $("#qr_scanner").hover(function(){$("#qr_sorry").css('color', '#707172');},function(){$("#qr_sorry").css('color', '#EEEFF0');});
     reset();
 }
 
 function reset() {
     $("#wallet").hide();
-    $("#scan").hide();
-    $("#info").hide();
+    $("#purchaseinfo").hide();
     $("#pay").hide();
     wallets = {};
-    $("#payinfo").val("");
+    $("#addressinput").val("");
     payinfo = {};
-    $("#ordername").empty();
-    $("#ordercost").empty();
-    $("#orderasset").empty();
+    $("#item-detail").empty();
+    $("#item-detail").text("-");
+    $("#item-pointtype").empty();
+    $("#item-pointtype").text("-");
+    $("#item-price").empty();
+    $("#item-price").text("-");
     $("#exinfo").empty();
     $("[data-key=\"mc\"]").empty();
     getWalletInfo();
 }
 
 function getWalletInfo() {
-    $("#winfo").empty();
     $.getJSON(url + "walletinfo")
         .done(function (walletinfo) {
             for (let key in walletinfo.balance) {
@@ -39,7 +41,7 @@ function getWalletInfo() {
                 } else {
                     var wallet = {
                         sname: key,
-                        lname: key + "ポイント",
+                        lname: key + "pt",
                         point: walletinfo.balance[key]
                     }
                     wallets[key] = wallet;
@@ -49,28 +51,66 @@ function getWalletInfo() {
         })
         .fail(function (jqXHR, textStatus, errorThrown) {
             if (confirm("walletinfo fail\n" + JSON.stringify(jqXHR) + "\n" + textStatus + "\n"
-                + errorThrown + "\nウォレット情報の取得に失敗しました、リトライしますか？")) {
+                + errorThrown + "\nCannot retrieve wallet info. Do you want to retry?")) {
                 reset();
             }
         });
 }
 
 function setWalletInfo() {
-    $("#winfo").empty();
-    for (let key in wallets) {
-        let name = $("<td>").text(wallets[key].lname).attr("title", wallets[key].lname).addClass("lname");
-        let coron = $("<td>").text("：");
-        let point = $("<td>").text(wallets[key].point);
-        let tr = $("<tr>").append(name).append(coron).append(point);
-        $("#winfo").append(tr);
+  $("#walletpoints").empty();
+  var i = 0;
+  var j = Object.keys(wallets).length - 1;
+  for (let key in wallets) {
+    var additionalClass = "";
+    switch (i) {
+      case 0:
+        additionalClass = "toppoint";
+        break;
+      case j:
+        additionalClass = "bottompoint";
+        break;
+      default:
+        additionalClass = "middlepoint";
     }
-    $("#wallet").show();
-    $("#scan").show();
+    $("#walletpoints").append(
+      $("<div/>")
+        .addClass(additionalClass + " row point")
+        .attr("id", wallets[key].sname)
+        .append($("<div/>")
+          .addClass("col-md-4 col-md-offset-1 text-center")
+          .append($("<button/>")
+            .addClass("btn btn-unpayable btn-point")
+            .prop("disabled", true)
+            .attr("data-key", wallets[key].sname)
+            .attr("id", wallets[key].sname+"-btn")
+            .append($('<img src="./'+wallets[key].sname+'.png">'))))
+        .append($("<div/>")
+          .addClass("col-md-2 text-center points-values")
+          .attr("id", wallets[key].sname+"-balance")
+          .text(wallets[key].point))
+        .append($("<div/>")
+          .addClass("col-md-1 text-center points-values")
+          .text("→"))
+        .append($("<div/>")
+          .addClass("col-md-3 text-center points-values")
+          .attr("id", wallets[key].sname+"-remainder")
+          .text("-"))
+        .append($("<div>/")
+          .addClass("col-md-1 text-center paypointer")
+          .attr("id", wallets[key].sname+"-pointer")
+          .text("▶︎"))
+    );
+    if (i!=j) {
+      $("#walletpoints").append($("<div/>").addClass("row pointseparator"));
+    }
+    i++;
+  }
 }
 
 function getPayInfo() {
     //px:invoice?addr=2dcyt9LFshsNYNzPzXAtpzTkCo4kKJKjgG2&asset=ASSET&name=PRODUCTNAME&price=PRICE
-    let uri = $("#payinfo").val();
+    let uri = $("#addressinput").val();
     let q = uri.split("?");
     let errFlg = true;
     if (q[0] == "px:invoice") {
@@ -84,8 +124,6 @@ function getPayInfo() {
         }
         if (payinfo["name"] && payinfo["addr"] && payinfo["price"] && payinfo["asset"]) {
             errFlg = false;
-            $("#wallet").hide();
-            $("#scan").hide();
             setOrderInfo(payinfo["name"], payinfo["price"], payinfo["asset"]);
             $("#info").show();
             getExchangeRate(payinfo["asset"], payinfo["price"]);
@@ -93,19 +131,19 @@ function getPayInfo() {
     }
     if (errFlg) {
         payinfo = {};
-        alert("支払い情報のフォーマットが正しくありません。\n" + uri);
+        alert("Incorrect payment info format.\n" + uri);
     }
+    $("#purchaseinfo").fadeIn("slow");
 }
 
 function setOrderInfo(name, price, asset) {
-    $("#ordername").empty();
-    $("#ordercost").empty();
-    $("#orderasset").empty();
-    $("#ordername").text(name);
-    $("#ordercost").text(price);
-    $("#orderasset").text(asset);
+  $("#item-detail").empty();
+  $("#item-detail").text(name);
+  $("#item-pointtype").empty();
+  $("#item-pointtype").text(asset);
+  $("#item-price").empty();
+  $("#item-price").text(price + " pt");
 }
-
 
 function getExchangeRate(asset, cost) {
     $.getJSON(url + "offer", { asset: "" + asset, cost: "" + cost })
@@ -120,38 +158,27 @@ function getExchangeRate(asset, cost) {
 }
 
 function setExchangeRate() {
-    $("#exinfo").empty();
-    let offer = payinfo["offer"];
-    if (offer) {
-        for (let key in offer) {
-            let possible = false;
-            let name = key;
-            let cost = offer[key].cost + offer[key].fee;
-            let point = "-";
-            let w = wallets[key];
-            if (w) {
-                name = w.sname;
-                point = w.point;
-                if (cost <= point) {
-                    possible = true;
-                }
-                let tr = $("<tr>");
-                let btn = $("<button>").text(name).attr("data-key", key);
-                let ctd = $("<td>").text(cost);
-                if (possible) {
-                    btn.click(confirmExchange);
-                    btn.addClass("possible");
-                } else {
-                    btn.addClass("impossible");
-                    ctd.addClass("impossible");
-                }
-                tr.append($("<td>").append(btn)).append($("<td>").text("："))
-                    .append(ctd).append($("<td>").text("(" + point + ")"));
-                $("#exinfo").append(tr);
-            }
-            $("#pay").show();
-        }
+  let offer = payinfo["offer"];
+  if (offer) {
+    for (var key in offer) {
+      var total_cost = offer[key].cost + offer[key].fee;
+      var balance = wallets[key].point;
+      $("#"+key+"-remainder").empty();
+      var remainder = balance-total_cost;
+      $("#"+key+"-remainder").text(total_cost+" ("+remainder+")");
+      if (total_cost <= balance) {
+        $("#"+key+"-btn")
+          .removeClass("btn-unpayable")
+          .addClass("btn-payable")
+          .prop("disabled", false)
+          .click(confirmExchange);
+        $("#"+key+"-pointer").show();
+      }
+      else {
+        $("#"+key+"-remainder").addClass("points-negative");
+      }
     }
+  }
 }
 
 function confirmExchange() {
@@ -159,6 +186,7 @@ function confirmExchange() {
     $("[data-key=\"mc\"]").empty();
     let offer = payinfo["offer"][payinfo["exasset"]];
     if (offer) {
+        $("#dest_address").text(payinfo["addr"]);
         $("#bpoint").text(offer["cost"]);
         $("#basset").text(payinfo["exasset"]);
         $("#apoint").text(payinfo["price"]);
@@ -187,7 +215,7 @@ function okpay() {
                 $("#modal-thank").show();
             })
             .fail(function (jqXHR, textStatus, errorThrown) {
-                alert("offer fail\n" + JSON.stringify(jqXHR) + "\n" + textStatus + "\n" + errorThrown + "\n");
+                alert("Offer failed\n" + JSON.stringify(jqXHR) + "\n" + textStatus + "\n" + errorThrown + "\n");
                 reset();
             });
     } else {
