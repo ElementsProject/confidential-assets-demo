@@ -3,7 +3,7 @@
 		"rpcurl": "http://127.0.0.1:10000/",
 		"rpcuser": "user",
 		"rpcpass": "pass",
-		"listen": "8000"
+		"laddr": ":8000"
 	},
 	"bob": {
 		"rpcurl": "http://127.0.0.1:10010/",
@@ -14,7 +14,7 @@
 		"rpcurl": "http://127.0.0.1:10020/",
 		"rpcuser": "user",
 		"rpcpass": "pass",
-		"listen": "8020",
+		"laddr": ":8020",
 		"fixrate": {
 			"AIRSKY":{
 				"MELON":{"rate":0.5,"min":100,"max":200000,"unit":20,"fee":15},
