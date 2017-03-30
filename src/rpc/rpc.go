@@ -32,20 +32,23 @@ type ValidatedAddress struct {
 }
 
 type Unspent struct {
-	Txid          string `json:"txid"`          // "txid"          : "txid",    (string)  the transaction id
-	Vout          int64  `json:"vout"`          // "vout"          : n,         (numeric) the vout value
-	Address       string `json:"address"`       // "address"       : "address", (string)  the bitcoin address
-	Account       string `json:"account"`       // "account"       : "account", (string)  DEPRECATED. The associated account, or "" for the default account
-	ScriptPubKey  string `json:"scriptPubKey"`  // "scriptPubKey"  : "key",     (string)  the script key
-	Amount        int64  `json:"amount"`        // "amount"        : x.xxx,     (numeric) the transaction amount in BTC
-	Asset         string `json:"asset"`         // "asset"         : "hex"      (string)  the asset id for this output
-	Confirmations int64  `json:"confirmations"` // "confirmations" : n,         (numeric) The number of confirmations
-	SerValue      string `json:"serValue"`      // "serValue"      : "hex",     (string)  the output's value commitment
-	Blinder       string `json:"blinder"`       // "blinder"       : "blind"    (string)  The blinding factor used for a confidential output (or "")
-	RedeemScript  string `json:"redeemScript"`  // "redeemScript"  : n          (string)  The redeemScript if scriptPubKey is P2SH
-	Spendable     bool   `json:"spendable"`     // "spendable"     : xxx,       (bool)    Whether we have the private keys to spend this output
-	Solvable      bool   `json:"solvable"`      // "solvable"      : xxx        (bool)    Whether we know how to spend this output, ignoring the lack of keys
+	Txid            string `json:"txid"`            // "txid"            : "txid",    (string)  the transaction id
+	Vout            int64  `json:"vout"`            // "vout"            : n,         (numeric) the vout value
+	Address         string `json:"address"`         // "address"         : "address", (string)  the bitcoin address
+	Account         string `json:"account"`         // "account"         : "account", (string)  DEPRECATED. The associated account, or "" for the default account
+	ScriptPubKey    string `json:"scriptPubKey"`    // "scriptPubKey"    : "key",     (string)  the script key
+	Amount          int64  `json:"amount"`          // "amount"          : x.xxx,     (numeric) the transaction amount in BTC
+	Asset           string `json:"asset"`           // "asset"           : "hex"      (string)  the asset id for this output
+	AssetCommitment string `json:"assetcommitment"` // "assetcommitment" : "hex"      (string)  the asset commitment for this output
+	Confirmations   int64  `json:"confirmations"`   // "confirmations"   : n,         (numeric) The number of confirmations
+	SerValue        string `json:"serValue"`        // "serValue"        : "hex",     (string)  the output's value commitment
+	Blinder         string `json:"blinder"`         // "blinder"         : "blind"    (string)  The blinding factor used for a confidential output (or "")
+	RedeemScript    string `json:"redeemScript"`    // "redeemScript"    : n          (string)  The redeemScript if scriptPubKey is P2SH
+	Spendable       bool   `json:"spendable"`       // "spendable"       : xxx,       (bool)    Whether we have the private keys to spend this output
+	Solvable        bool   `json:"solvable"`        // "solvable"        : xxx        (bool)    Whether we know how to spend this output, ignoring the lack of keys
 }
+
+type UnspentList []*Unspent
 
 type Balance map[string]float64
 
