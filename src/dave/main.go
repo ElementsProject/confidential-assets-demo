@@ -33,6 +33,9 @@ var rpcpass string = "pass"
 // Listen addr for RPC Proxy
 var laddr string = ":8030"
 
+//  getNewAddress use confidential
+var confidential = false
+
 var rpcClient *rpc.Rpc
 
 var interval = 3 * time.Second
@@ -62,29 +65,6 @@ var list []*Order = []*Order{}
 var logger *log.Logger
 
 var stop bool = false
-
-type Address struct {
-	Unconfidential string `json:"unconfidential,"`
-}
-
-func getNewAddress() (string, error) {
-	var address Address
-	addr, res, err := rpcClient.RequestAndCastString("getnewaddress")
-	if err != nil {
-		logger.Printf("Rpc#RequestAndCastString error:%v res:%+v", err, res)
-		return address.Unconfidential, err
-	}
-	res, err = rpcClient.RequestAndUnmarshalResult(&address, "validateaddress", addr)
-	if err != nil {
-		logger.Printf("Rpc#RequestAndUnmarshalResult error:%v res:%+v", err, res)
-		return address.Unconfidential, err
-	}
-	if address.Unconfidential == "" {
-		logger.Println("unconfidential is empty.", res)
-		return address.Unconfidential, fmt.Errorf("unconfidential is empty. %+v", res)
-	}
-	return address.Unconfidential, nil
-}
 
 func loop() {
 	fmt.Println("Loop interval:", interval)
@@ -129,7 +109,7 @@ func orderhandler(w http.ResponseWriter, r *http.Request) {
 	result["result"] = false
 	for key, val := range items {
 		if key == item {
-			addr, err := getNewAddress()
+			addr, err := rpcClient.GetNewAddr(confidential)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				logger.Println("getNewAddress error", err)
@@ -156,6 +136,10 @@ func orderhandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+	if !result["result"].(bool) {
+		w.WriteHeader(http.StatusNotFound)
+		result["error"] = fmt.Sprint("Not Found item. ", item)
+	}
 	bs, _ := json.Marshal(result)
 	w.Write(bs)
 }
@@ -178,6 +162,7 @@ func loadConf() {
 	rpcuser = conf.GetString("rpcuser", rpcuser)
 	rpcpass = conf.GetString("rpcpass", rpcpass)
 	laddr = conf.GetString("laddr", laddr)
+	confidential = conf.GetBool("confidential", confidential)
 }
 
 func main() {
