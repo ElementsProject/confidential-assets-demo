@@ -58,7 +58,7 @@ func (rpc* Rpc) GetNewAddr(confidential bool) (string, error) {
  * as an array of hex strings.
  */
 func (rpc* Rpc) GetCommitments(utxos UnspentList) ([]string, error) {
-	var commitments []string = make(string, len(utxos))
+	var commitments []string = make([]string, len(utxos))
 
 	for i, u := range utxos {
 		commitments[i] = u.AssetCommitment
