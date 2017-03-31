@@ -19,15 +19,16 @@ ELTX=elements-tx
 
 ## cleanup previous data
 for i in alice bob charlie dave fred; do
-    ${ELCLI} -datadir=${DEMOD}/data/${i} stop
+    ${ELCLI} -datadir=${DEMOD}/data/${i} stop 2>/dev/null
     pkill -SIGINT $i
-    sleep 3
 done
 pkill ${ELDAE}
 sleep 2
 
 ## cleanup previous data
 rm -rf ${DEMOD}/data
+
+echo "initial setup - asset generation"
 
 ## setup nodes
 PORT=0
@@ -46,10 +47,49 @@ listen=1
 txindex=1
 keypool=10
 EOF
-    PORT=$(($PORT + 10))
+    let PORT=PORT+10
     alias ${i}-dae="${ELDAE} -datadir=${DEMOD}/data/$i"
     alias ${i}-tx="${ELTX}"
     alias ${i}="${ELCLI} -datadir=${DEMOD}/data/$i"
+done
+
+fred-dae
+
+LDW=1
+while [ "${LDW}" = "1" ]
+do
+  LDW=0
+  fred getwalletinfo > /dev/null 2>&1 || LDW=1
+  if [ "${LDW}" = "1" ]; then
+    sleep 1
+  fi
+done
+
+echo "- generating initial blocks to reach maturity"
+
+## generate assets
+fred generate 100 >/dev/null
+
+echo -n -e "- generating AIRSKY asset"
+AIRSKY=$(fred generateasset 1000000)
+echo -n -e ": $AIRSKY\n- generating MELON asset"
+MELON=$(fred generateasset 2000000)
+echo -n -e ": $MELON\n- generating MONECRE asset"
+MONECRE=$(fred generateasset 2000000)
+echo ": $MONECRE"
+
+echo -n -e "final setup - starting daemons"
+
+fred stop
+sleep 1
+
+## setup nodes phase 2
+for i in alice bob charlie dave fred; do
+    cat <<EOF >> ${DEMOD}/data/$i/elements.conf
+assetdir=$AIRSKY:AIRSKY
+assetdir=$MELON:MELON
+assetdir=$MONECRE:MONECRE
+EOF
     ${ELDAE} -datadir=${DEMOD}/data/$i
 done
 
@@ -57,71 +97,49 @@ LDW=1
 while [ "${LDW}" = "1" ]
 do
   LDW=0
-  alice getinfo > /dev/null 2>&1 || LDW=1
-  bob getinfo > /dev/null 2>&1 || LDW=1
-  charlie getinfo > /dev/null 2>&1 || LDW=1
-  dave getinfo > /dev/null 2>&1 || LDW=1
-  fred getinfo > /dev/null 2>&1 || LDW=1
+  alice getwalletinfo > /dev/null 2>&1 || LDW=1
+  bob getwalletinfo > /dev/null 2>&1 || LDW=1
+  charlie getwalletinfo > /dev/null 2>&1 || LDW=1
+  dave getwalletinfo > /dev/null 2>&1 || LDW=1
+  fred getwalletinfo > /dev/null 2>&1 || LDW=1
   if [ "${LDW}" = "1" ]; then
-    sleep 2
+    echo -n -e "."
+    sleep 1
   fi
 done
 
-echo start
+echo " nodes started"
 
 alice addnode 127.0.0.1:10011 onetry
 bob addnode 127.0.0.1:10021 onetry
 charlie addnode 127.0.0.1:10031 onetry
 dave addnode 127.0.0.1:10041 onetry
 fred addnode 127.0.0.1:10041 onetry
-sleep 2
 
-## generate point
-fred generate 101
-fred generateasset "AIRSKY"   1000000
-fred generateasset "MELON" 2000000
-fred generateasset "MONECRE" 2000000
-fred getwalletinfo "*"
-
-AIRSKY=$(fred dumpassetlabels | jq -r ".AIRSKY")
-MELON=$(fred dumpassetlabels | jq -r ".MELON")
-MONECRE=$(fred dumpassetlabels | jq -r ".MONECRE")
-
-alice addassetlabel $AIRSKY "AIRSKY"
-alice addassetlabel $MELON "MELON"
-alice addassetlabel $MONECRE "MONECRE"
-bob addassetlabel $AIRSKY "AIRSKY"
-bob addassetlabel $MELON "MELON"
-bob addassetlabel $MONECRE "MONECRE"
-charlie addassetlabel $AIRSKY "AIRSKY"
-charlie addassetlabel $MELON "MELON"
-charlie addassetlabel $MONECRE "MONECRE"
-dave addassetlabel $AIRSKY "AIRSKY"
-dave addassetlabel $MELON "MELON"
-dave addassetlabel $MONECRE "MONECRE"
+## generate assets
+fred getwalletinfo
 
 ## preset asset
-echo AIRSKY
+echo -n -e "AIRSKY"
 fred sendtoaddress $(alice validateaddress $(alice getnewaddress) | jq -r ".unconfidential") 500 "" "" false "AIRSKY"
 sleep 1
-echo MELON
+echo -n -e "\nMELON"
 fred sendtoaddress $(alice validateaddress $(alice getnewaddress) | jq -r ".unconfidential") 100 "" "" false "MELON"
 sleep 1
-echo MONECRE
+echo -n -e "\nMONECRE"
 fred sendtoaddress $(alice validateaddress $(alice getnewaddress) | jq -r ".unconfidential") 150 "" "" false "MONECRE"
-sleep 1
 fred generate 1
 sleep 1 # wait for sync
-alice getwalletinfo "*"
+alice getwalletinfo
 
 for i in 100 200 300 400 500; do
-for j in AIRSKY MELON MONECRE; do
-fred sendtoaddress $(charlie validateaddress $(charlie getnewaddress) | jq -r ".unconfidential") $i "" "" false "$j"
-done
+  for j in AIRSKY MELON MONECRE; do
+    fred sendtoaddress $(charlie validateaddress $(charlie getnewaddress) | jq -r ".unconfidential") $i "" "" false "$j"
+  done
 done
 fred generate 1
 sleep 1 # wait for sync
-charlie getwalletinfo "*"
+charlie getwalletinfo
 
 cd ${DEMOD}
 for i in alice bob charlie dave fred; do
