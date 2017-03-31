@@ -17,18 +17,30 @@ import (
 	"rpc"
 )
 
-// URL for accessing RPC
+type Block struct {
+	Tx []string `json:"tx,"`
+}
+
+type Transaction struct {
+	Vout []Output `json:"vout,"`
+}
+
+type Output struct {
+	Value        float64                `json:"value,"`
+	Fee          float64                `json:"fee_value,"`
+	Assetid      string                 `json:"assetid,"`
+	Assettag     string                 `json:"assettag,"`
+	N            int                    `json:"n,"`
+	ScriptPubKey map[string]interface{} `json:"scriptPubKey,"`
+}
+
+const interval = 3 * time.Second
+
 var rpcurl string = "http://127.0.0.1:10010"
-
-// ID for accessing RPC
 var rpcuser string = "user"
-
-// Password for accessing RPC
-var rpcpass string = "pass"
+var rpcpass = "pass"
 
 var rpcClient *rpc.Rpc
-
-var interval = 3 * time.Second
 
 var assets = make(map[string]string)
 
@@ -43,10 +55,6 @@ func getblockcount() (int, error) {
 		return -1, err
 	}
 	return int(blockcount), nil
-}
-
-type Block struct {
-	Tx []string `json:"tx,"`
 }
 
 func viewBlock(height int) error {
@@ -65,19 +73,6 @@ func viewBlock(height int) error {
 		printtxouts(fmt.Sprintf("%v", tx))
 	}
 	return nil
-}
-
-type Transaction struct {
-	Vout []Output `json:"vout,"`
-}
-
-type Output struct {
-	Value        float64                `json:"value,"`
-	Fee          float64                `json:"fee_value,"`
-	Assetid      string                 `json:"assetid,"`
-	Assettag     string                 `json:"assettag,"`
-	N            int                    `json:"n,"`
-	ScriptPubKey map[string]interface{} `json:"scriptPubKey,"`
 }
 
 func printtxouts(txid string) error {
