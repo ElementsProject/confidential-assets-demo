@@ -177,6 +177,19 @@ type CyclicProcess struct {
 	interval int
 }
 
+const (
+	myActorName          = "alice"
+	defaultRpcURL        = "http://127.0.0.1:10000"
+	defaultRpcUser       = "user"
+	defaultPpcPass       = "pass"
+	defaultListen        = "8000"
+	defaultTxPath        = "elements-tx"
+	defaultTxOption      = ""
+	defaultTimeout       = 600
+	exchangerName        = "charlie"
+	defaultCharlieListen = "8020"
+)
+
 var logger *log.Logger = log.New(os.Stdout, myActorName+":", log.LstdFlags+log.Lshortfile)
 var conf = democonf.NewDemoConf(myActorName)
 var stop bool = false
@@ -200,19 +213,6 @@ var handlerList = map[string]func(url.Values, string) ([]byte, error){
 }
 
 var cyclics = []CyclicProcess{CyclicProcess{handler: sweep, interval: 3}}
-
-const (
-	myActorName          = "alice"
-	defaultRpcURL        = "http://127.0.0.1:10000"
-	defaultRpcUser       = "user"
-	defaultPpcPass       = "pass"
-	defaultListen        = "8000"
-	defaultTxPath        = "elements-tx"
-	defaultTxOption      = ""
-	defaultTimeout       = 600
-	exchangerName        = "charlie"
-	defaultCharlieListen = "8020"
-)
 
 func getMyBalance() (rpc.Balance, error) {
 	wallet, err := getWalletInfo()
@@ -250,6 +250,7 @@ func doWalletInfo(reqParam url.Values, reqBody string) ([]byte, error) {
 	return b, nil
 
 }
+
 func chooseKnownAssets(b rpc.Balance) {
 	for k, _ := range b {
 		if _, ok := assetIdMap[k]; !ok {
@@ -614,8 +615,6 @@ func initialize() {
 
 	exchangeOfferURL = "http://127.0.0.1" + exchangerConf.GetString("laddr", defaultCharlieListen) + "/getexchangeoffer/"
 	exchangeSubmitURL = "http://127.0.0.1" + exchangerConf.GetString("laddr", defaultCharlieListen) + "/submitexchange/"
-	//	exchangeOfferURL = exchangerConf.GetString("laddr", defaultCharlieListen) + "/getexchangeoffer/"
-	//	exchangeSubmitURL = exchangerConf.GetString("laddr", defaultCharlieListen) + "/submitexchange/"
 }
 
 func stratHttpServer(laddr string, handlers map[string]func(url.Values, string) ([]byte, error), filepath string) (net.Listener, error) {
@@ -718,6 +717,7 @@ func cyclicProcStart(cps []CyclicProcess) {
 		}()
 	}
 }
+
 func waitStopSignal() {
 	for {
 		time.Sleep(1 * time.Second)
