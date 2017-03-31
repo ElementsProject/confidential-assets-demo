@@ -121,24 +121,30 @@ fred getwalletinfo
 
 ## preset asset
 echo -n -e "AIRSKY"
-fred sendtoaddress $(alice validateaddress $(alice getnewaddress) | jq -r ".unconfidential") 500 "" "" false "AIRSKY"
+fred sendtoaddress $(alice validateaddress $(alice getnewaddress) | jq -r ".unconfidential") 500 "" "" false "AIRSKY" >/dev/null
 sleep 1
 echo -n -e "\nMELON"
-fred sendtoaddress $(alice validateaddress $(alice getnewaddress) | jq -r ".unconfidential") 100 "" "" false "MELON"
+fred sendtoaddress $(alice validateaddress $(alice getnewaddress) | jq -r ".unconfidential") 100 "" "" false "MELON" >/dev/null
 sleep 1
 echo -n -e "\nMONECRE"
-fred sendtoaddress $(alice validateaddress $(alice getnewaddress) | jq -r ".unconfidential") 150 "" "" false "MONECRE"
-fred generate 1
+fred sendtoaddress $(alice validateaddress $(alice getnewaddress) | jq -r ".unconfidential") 150 "" "" false "MONECRE" >/dev/null
+echo -n -e "\n"
+fred generate 1 >/dev/null
 sleep 1 # wait for sync
+echo "Alice wallet:"
 alice getwalletinfo
 
+echo -n -e "Sending to Charlie [               ]\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
 for i in 100 200 300 400 500; do
   for j in AIRSKY MELON MONECRE; do
-    fred sendtoaddress $(charlie validateaddress $(charlie getnewaddress) | jq -r ".unconfidential") $i "" "" false "$j"
+    fred sendtoaddress $(charlie validateaddress $(charlie getnewaddress) | jq -r ".unconfidential") $i "" "" false "$j" >/dev/null
+    echo -n -e "."
   done
 done
+echo ""
 fred generate 1
 sleep 1 # wait for sync
+echo "Charlie wallet:"
 charlie getwalletinfo
 
 cd ${DEMOD}
@@ -149,7 +155,8 @@ done
 cd "$(dirname "${BASH_SOURCE[0]}")"
 sleep 2
 
-echo "OK. Enjoy Demo."
+echo "Setup complete. Use these URLs to test it out:"
 echo "Alice -> http://127.0.0.1:8000/"
 echo "Dave  -> http://127.0.0.1:8030/order.html"
 echo "Dave  -> http://127.0.0.1:8030/list.html"
+echo "When finished, run stop_demo.sh"
