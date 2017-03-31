@@ -34,7 +34,7 @@ func NewDemoConf(section string) *DemoConf {
 	}
 	val, ok := j[section]
 	if !ok {
-		conf.logger.Println("not found section", section)
+		conf.logger.Println("section not found", section)
 		return conf
 	}
 	conf.Data = val
@@ -49,7 +49,7 @@ func (conf *DemoConf) GetString(key string, defaultValue string) string {
 	}
 	str, ok := val.(string)
 	if !ok {
-		conf.logger.Printf("type is not string. Type: %T, Value: %+v\n", val, val)
+		conf.logger.Printf("type is not a string. Type: %T, Value: %+v\n", val, val)
 		return defaultValue
 	}
 	return str
@@ -63,7 +63,7 @@ func (conf *DemoConf) GetNumber(key string, defaultValue float64) float64 {
 	}
 	num, ok := val.(float64)
 	if !ok {
-		conf.logger.Printf("type is not number. Type: %T, Value: %+v\n", val, val)
+		conf.logger.Printf("type is not a number. Type: %T, Value: %+v\n", val, val)
 		return defaultValue
 	}
 	return num
@@ -77,7 +77,7 @@ func (conf *DemoConf) GetBool(key string, defaultValue bool) bool {
 	}
 	b, ok := val.(bool)
 	if !ok {
-		conf.logger.Printf("type is not bool. Type: %T, Value: %+v\n", val, val)
+		conf.logger.Printf("type is not a bool. Type: %T, Value: %+v\n", val, val)
 		return defaultValue
 	}
 	return b
