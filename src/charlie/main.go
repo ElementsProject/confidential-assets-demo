@@ -49,6 +49,8 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
+// Lock lists to keep referenced utxos (potentially to-be-spent)
+
 type LockList map[string]time.Time
 
 func (ll LockList) lock(txid string, vout int64) bool {
@@ -119,6 +121,19 @@ type CyclicProcess struct {
 	interval int
 }
 
+const (
+	myActorName     = "charlie"
+	defaultRateFrom = "AKISKY"
+	defaultRateTo   = "MELON"
+	defaultRpcURL   = "http://127.0.0.1:10020"
+	defaultRpcUser  = "user"
+	defaultPpcPass  = "pass"
+	defaultListen   = "8020"
+	defaultTxPath   = "elements-tx"
+	defaultTxOption = ""
+	defaultTimeout  = 600
+)
+
 var logger *log.Logger = log.New(os.Stdout, myActorName+":", log.LstdFlags+log.Lshortfile)
 var conf = democonf.NewDemoConf(myActorName)
 var stop bool = false
@@ -138,19 +153,6 @@ var handlerList = map[string]func(url.Values, string) ([]byte, error){
 }
 
 var cyclics = []CyclicProcess{CyclicProcess{handler: sweep, interval: 3}}
-
-const (
-	myActorName     = "charlie"
-	defaultRateFrom = "AKISKY"
-	defaultRateTo   = "MELON"
-	defaultRpcURL   = "http://127.0.0.1:10020"
-	defaultRpcUser  = "user"
-	defaultPpcPass  = "pass"
-	defaultListen   = "8020"
-	defaultTxPath   = "elements-tx"
-	defaultTxOption = ""
-	defaultTimeout  = 600
-)
 
 func getReqestBodyMap(reqBody string) (map[string]interface{}, error) {
 	var reqBodyMap interface{}
@@ -553,6 +555,7 @@ func cyclicProcStart(cps []CyclicProcess) {
 		}()
 	}
 }
+
 func waitStopSignal() {
 	for {
 		time.Sleep(1 * time.Second)
