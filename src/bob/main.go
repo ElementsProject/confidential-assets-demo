@@ -147,7 +147,7 @@ func loadConf() {
 
 func main() {
 	logger = log.New(os.Stdout, "Bob:", log.LstdFlags+log.Lshortfile)
-	fmt.Println("Bob start")
+	fmt.Println("Bob starting")
 
 	loadConf()
 	rpcClient = rpc.NewRpc(rpcurl, rpcuser, rpcpass)
@@ -161,5 +161,5 @@ func main() {
 	}()
 
 	loop()
-	fmt.Println("Bob stop")
+	fmt.Println("Bob stopping")
 }

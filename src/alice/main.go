@@ -287,7 +287,7 @@ func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
 		return nil, err
 	}
 	if len(tmp) != 1 {
-		err := errors.New("cost must single record:" + fmt.Sprintf("%d", len(tmp)))
+		err := errors.New("cost must be a single record:" + fmt.Sprintf("%d", len(tmp)))
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -387,7 +387,7 @@ func doSend(reqParam url.Values, reqBody string) ([]byte, error) {
 	}
 
 	if len(tmp) != 1 {
-		err := errors.New("id must single record:" + fmt.Sprintf("%d", len(tmp)))
+		err := errors.New("id must be a single record:" + fmt.Sprintf("%d", len(tmp)))
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -401,7 +401,7 @@ func doSend(reqParam url.Values, reqBody string) ([]byte, error) {
 	}
 
 	if len(tmp) != 1 {
-		err := errors.New("addr must single record:" + fmt.Sprintf("%d", len(tmp)))
+		err := errors.New("addr must be a single record:" + fmt.Sprintf("%d", len(tmp)))
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -496,7 +496,7 @@ func searchUnspent(requestAsset string, requestAmount int64) (UnspentList, error
 
 	if requestAmount >= totalAmount {
 		unlockUnspentList(utxos)
-		err = errors.New("no sufficient utxo.")
+		err = errors.New("no sufficient utxo found")
 		logger.Println("error:", err)
 		return utxos, err
 	}
@@ -631,7 +631,7 @@ func stratHttpServer(laddr string, handlers map[string]func(url.Values, string) 
 	}
 
 	mux.Handle("/", http.FileServer(http.Dir(filepath)))
-	logger.Println("start listen...", listener.Addr().Network(), listener.Addr())
+	logger.Println("start listening...", listener.Addr().Network(), listener.Addr())
 	go http.Serve(listener, mux)
 
 	return listener, err
@@ -693,7 +693,7 @@ func handler(w http.ResponseWriter, r *http.Request, f func(url.Values, string) 
 
 func createErrorByteArray(e error) []byte {
 	if e == nil {
-		e = errors.New("error occured.(fake)")
+		e = errors.New("error occured (fake)")
 	}
 	res := ErrorResponse{
 		Result:  false,
