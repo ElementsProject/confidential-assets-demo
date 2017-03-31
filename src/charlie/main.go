@@ -205,7 +205,7 @@ func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
 
 	offer, ok := tmp.(string)
 	if !ok {
-		err = errors.New("type of offer is not string:" + fmt.Sprintf("%s", tmp))
+		err = errors.New("type of offer is not a string:" + fmt.Sprintf("%s", tmp))
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -303,7 +303,7 @@ func doSubmit(rreqParam url.Values, reqBody string) ([]byte, error) {
 
 	rcvtx, ok := tmp.(string)
 	if !ok {
-		err = errors.New("type of tx is not string:" + fmt.Sprintf("%V", tmp))
+		err = errors.New("type of tx is not a string:" + fmt.Sprintf("%V", tmp))
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -408,7 +408,7 @@ func searchUnspent(requestAsset string, requestAmount int64) (UnspentList, error
 
 	if requestAmount >= totalAmount {
 		unlockUnspentList(utxos)
-		err = errors.New("no sufficient utxo.")
+		err = errors.New("no sufficient utxo")
 		logger.Println("error:", err)
 		return utxos, err
 	}
@@ -469,7 +469,7 @@ func stratHttpServer(laddr string, handlers map[string]func(url.Values, string) 
 	}
 
 	mux.Handle("/", http.FileServer(http.Dir(filepath)))
-	logger.Println("start listen...", listener.Addr().Network(), listener.Addr())
+	logger.Println("start listening...", listener.Addr().Network(), listener.Addr())
 	go http.Serve(listener, mux)
 
 	return listener, err
@@ -531,7 +531,7 @@ func handler(w http.ResponseWriter, r *http.Request, f func(url.Values, string) 
 
 func createErrorByteArray(e error) []byte {
 	if e == nil {
-		e = errors.New("error occured.(fake)")
+		e = errors.New("error occured (fake)")
 	}
 	res := ErrorResponse{
 		Result:  false,
