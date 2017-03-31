@@ -167,7 +167,7 @@ func loadConf() {
 
 func main() {
 	logger = log.New(os.Stdout, "Dave:", log.LstdFlags+log.Lshortfile)
-	fmt.Println("Dave start")
+	fmt.Println("Dave starting")
 
 	loadConf()
 	rpcClient = rpc.NewRpc(rpcurl, rpcuser, rpcpass)
@@ -185,7 +185,7 @@ func main() {
 	dir, _ := os.Getwd()
 	fmt.Println("html path:", http.Dir(dir+"/html/dave"))
 	mux.Handle("/", http.FileServer(http.Dir(dir+"/html/dave")))
-	fmt.Println("start listen...", listener.Addr().Network(), listener.Addr())
+	fmt.Println("start listening...", listener.Addr().Network(), listener.Addr())
 	go http.Serve(listener, mux)
 
 	// signal handling (ctrl + c)
@@ -198,5 +198,5 @@ func main() {
 
 	loop()
 
-	fmt.Println("Dave stop")
+	fmt.Println("Dave stopping")
 }
