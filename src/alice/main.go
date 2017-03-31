@@ -520,7 +520,7 @@ func getAmount(ul UnspentList) int64 {
 func getWalletInfo() (rpc.Wallet, error) {
 	var walletInfo rpc.Wallet
 
-	_, err := rpcClient.RequestAndUnmarshalResult(&walletInfo, "getwalletinfo", "*")
+	_, err := rpcClient.RequestAndUnmarshalResult(&walletInfo, "getwalletinfo")
 	if err != nil {
 		logger.Println("RPC/getwalletinfo error:", err)
 		return walletInfo, err
