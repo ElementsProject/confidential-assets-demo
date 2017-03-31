@@ -9,7 +9,7 @@ GO=go
 
 cd $(dirname $0)
 
-GOPATH=$(pwd)
+export GOPATH=$(pwd)
 
 OUTDIR=demo
 
