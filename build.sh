@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# exit immediately if any error occurred
+set -e
+
 echo "=====build start====="
 
 GO=go
