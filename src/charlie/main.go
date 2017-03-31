@@ -49,73 +49,6 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
-// Lock lists to keep referenced utxos (potentially to-be-spent)
-
-type LockList map[string]time.Time
-
-func (ll LockList) lock(txid string, vout int64) bool {
-	key := getLockingKey(txid, vout)
-	now := time.Now()
-	to := now.Add(utxoLockDuration)
-
-	old, ok := ll[key]
-	if !ok {
-		// new lock.
-		ll[key] = to
-		return true
-	}
-	if old.Sub(now) < 0 {
-		// exists but no longer locked. lock again.
-		ll[key] = to
-		return true
-	}
-
-	// already locked.
-	return false
-}
-
-func (ll LockList) unlock(txid string, vout int64) {
-	key := getLockingKey(txid, vout)
-	delete(ll, key)
-
-	return
-}
-
-func (ll LockList) sweep() {
-	now := time.Now()
-	for k, v := range ll {
-		if v.Sub(now) < 0 {
-			delete(ll, k)
-		}
-	}
-}
-
-type UnspentList []*rpc.Unspent
-
-func (ul UnspentList) Len() int {
-	return len(ul)
-}
-
-func (ul UnspentList) Swap(i, j int) {
-	ul[i], ul[j] = ul[j], ul[i]
-}
-
-func (ul UnspentList) Less(i, j int) bool {
-	if (*ul[i]).Amount < (*ul[j]).Amount {
-		return true
-	}
-	if (*ul[i]).Amount > (*ul[j]).Amount {
-		return false
-	}
-	return (*ul[i]).Confirmations < (*ul[j]).Confirmations
-}
-
-func unlockUnspentList(ul UnspentList) {
-	for _, u := range ul {
-		lockList.unlock(u.Txid, u.Vout)
-	}
-}
-
 type CyclicProcess struct {
 	handler  func()
 	interval int
@@ -138,8 +71,7 @@ var logger *log.Logger = log.New(os.Stdout, myActorName+":", log.LstdFlags+log.L
 var conf = democonf.NewDemoConf(myActorName)
 var stop bool = false
 var assetIdMap = make(map[string]string)
-var lockList = make(LockList)
-var utxoLockDuration time.Duration
+var lockList = make(rpc.LockList)
 var rpcClient *rpc.Rpc
 var elementsTxCommand string
 var elementsTxOption string
@@ -152,7 +84,7 @@ var handlerList = map[string]func(url.Values, string) ([]byte, error){
 	"/submitexchange/":   doSubmit,
 }
 
-var cyclics = []CyclicProcess{CyclicProcess{handler: sweep, interval: 3}}
+var cyclics = []CyclicProcess{CyclicProcess{handler: lockList.Sweep, interval: 3}}
 
 func getReqestBodyMap(reqBody string) (map[string]interface{}, error) {
 	var reqBodyMap interface{}
@@ -242,7 +174,7 @@ func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
 	return b, nil
 }
 
-func createTransactionTemplate(requestAsset string, requestAmount int64, offer string, cost int64, utxos UnspentList) (string, error) {
+func createTransactionTemplate(requestAsset string, requestAmount int64, offer string, cost int64, utxos rpc.UnspentList) (string, error) {
 	change := getAmount(utxos) - requestAmount
 
 	addrOffer, err := rpcClient.GetNewAddr(false)
@@ -333,7 +265,7 @@ func doSubmit(rreqParam url.Values, reqBody string) ([]byte, error) {
 	}
 
 	for _, v := range rawTx.Vin {
-		lockList.unlock(v.Txid, v.Vout)
+		lockList.Unlock(v.Txid, v.Vout)
 	}
 
 	b, _ := json.Marshal(submitRes)
@@ -380,10 +312,10 @@ func lookupRate(requestAsset string, requestAmount int64, offer string) (OfferRe
 	return offerRes, nil
 }
 
-func searchUnspent(requestAsset string, requestAmount int64) (UnspentList, error) {
+func searchUnspent(requestAsset string, requestAmount int64) (rpc.UnspentList, error) {
 	var totalAmount int64 = 0
-	var ul UnspentList
-	var utxos UnspentList = make(UnspentList, 0)
+	var ul rpc.UnspentList
+	var utxos rpc.UnspentList = make(rpc.UnspentList, 0)
 
 	_, err := rpcClient.RequestAndUnmarshalResult(&ul, "listunspent", 1, 9999999, []string{}, requestAsset)
 	if err != nil {
@@ -396,7 +328,7 @@ func searchUnspent(requestAsset string, requestAmount int64) (UnspentList, error
 		if requestAmount < totalAmount {
 			break
 		}
-		if !lockList.lock(u.Txid, u.Vout) {
+		if !lockList.Lock(u.Txid, u.Vout) {
 			continue
 		}
 		if !(u.Spendable || u.Solvable) {
@@ -407,7 +339,7 @@ func searchUnspent(requestAsset string, requestAmount int64) (UnspentList, error
 	}
 
 	if requestAmount >= totalAmount {
-		unlockUnspentList(utxos)
+		lockList.UnlockUnspentList(utxos)
 		err = errors.New("no sufficient utxo")
 		logger.Println("error:", err)
 		return utxos, err
@@ -416,11 +348,7 @@ func searchUnspent(requestAsset string, requestAmount int64) (UnspentList, error
 	return utxos, nil
 }
 
-func getLockingKey(txid string, vout int64) string {
-	return fmt.Sprintf("%s:%d", txid, vout)
-}
-
-func getAmount(ul UnspentList) int64 {
+func getAmount(ul rpc.UnspentList) int64 {
 	var totalAmount int64 = 0
 
 	for _, u := range ul {
@@ -428,10 +356,6 @@ func getAmount(ul UnspentList) int64 {
 	}
 
 	return totalAmount
-}
-
-func sweep() {
-	lockList.sweep()
 }
 
 func initialize() {
@@ -450,7 +374,7 @@ func initialize() {
 	localAddr = conf.GetString("laddr", defaultListen)
 	elementsTxCommand = conf.GetString("txpath", defaultTxPath)
 	elementsTxOption = conf.GetString("txoption", defaultTxOption)
-	utxoLockDuration = time.Duration(int64(conf.GetNumber("timeout", defaultTimeout))) * time.Second
+	rpc.SetUtxoLockDuration(time.Duration(int64(conf.GetNumber("timeout", defaultTimeout))) * time.Second)
 	fixedRateTable[defaultRateFrom] = map[string]ExchangeRateTuple{defaultRateTo: defaultRateTuple}
 	conf.GetInterface("fixrate", &fixedRateTable)
 }
