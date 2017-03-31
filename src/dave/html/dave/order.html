@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Store</title>
+        <script src="./jquery-3.1.1.min.js"></script>
+        <script src="./jquery.qrcode.min.js"></script>
+        <script src="./order.js"></script>
+        <link rel="stylesheet" href="./order.css">
+    </head>
+    <body>
+        <div id="page">
+            <div id="head">
+                <div class="store">Frontstar&nbsp;Coffee</div>
+                <div class="office">フロントスターコーヒー&nbsp;渋谷駅前店</div>
+            </div>
+            <div id="before">
+                <img src="./coffee.jpg">
+                <div id="pinfo">
+                    <table>
+                        <tr class="sep">
+                            <td class="key"><div class="key">商品</div></td>
+                            <td class="val"><div class="pname">Caramel&nbsp;Macchiato&nbsp;Coffee</div></td>
+                        </tr>
+                        <tr>
+                            <td class="key"><div class="key">Price</div></td>
+                            <td class="val"><div class="passet">MELON</div><div class="pprice">200</div><div class="punit">pt</div></td>
+                        </tr>
+                    </table>
+                </div>
+                <button id="order">注文する</button>
+            </div>
+            <div id="after">
+                <div id="qrbase">
+                    <div class="qrtext">こちらのQRコードを読み取ってください</div>
+                    <div id="qrcode"></div>
+                    <div id="addr"></div>
+                    <div class="qrbar"></div>
+                    <div id="name"></div>
+                    <div class="qrval">
+                        <div id="asset"></div><div id="price"></div><div class="unit">pt</div>
+                    </div>
+                </div>
+                <input id="uri" type="text">
+            </div>
+        </div>
+    </body>
+</html>

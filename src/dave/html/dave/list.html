@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script src="./jquery-3.1.1.min.js"></script>
+    <script src="./list.js"></script>
+    <title>List</title>
+    <style>
+        #page {
+            width: 1024px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        table.ts7 {
+            border-top: 1px solid #FABF8F;
+            border-left: 1px solid #FABF8F;
+            border-right: 1px solid #FABF8F;
+            border-bottom: 1px solid #FABF8F;
+            border-collapse: collapse;
+            border-spacing: 0;
+            empty-cells: show;
+        }
+        
+        .ts7 th {
+            border-right: 1px solid #FABF8F;
+            color: #FFFFFF;
+            background-color: #F79646;
+            padding: 0.3em 1em;
+            text-align: center;
+            white-space: nowrap;
+        }
+        
+        .ts7 td {
+            border-right: 1px solid #FABF8F;
+            border-bottom: 1px solid #FABF8F;
+            padding: 0.3em 1em;
+            white-space: nowrap;
+        }
+        
+        .ts7 tr:nth-child(odd) {
+            background: #FDE9D9;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="page">
+        <div>LastModify:<span id="lm"></span></div>
+        <table class="ts7">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Addr</th>
+                    <th>Price</th>
+                    <th>Asset</th>
+                    <th>Status</th>
+                    <th>Timeout</th>
+                    <th>LastModify</th>
+                </tr>
+            </thead>
+            <tbody id="list">
+            </tbody>
+        </table>
+    </div>
+</body>
+
+</html>

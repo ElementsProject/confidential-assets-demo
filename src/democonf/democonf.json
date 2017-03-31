@@ -1,0 +1,45 @@
+{
+	"alice": {
+		"rpcurl": "http://127.0.0.1:10000/",
+		"rpcuser": "user",
+		"rpcpass": "pass",
+		"laddr": ":8000"
+	},
+	"bob": {
+		"rpcurl": "http://127.0.0.1:10010/",
+		"rpcuser": "user",
+		"rpcpass": "pass"
+	},
+	"charlie": {
+		"rpcurl": "http://127.0.0.1:10020/",
+		"rpcuser": "user",
+		"rpcpass": "pass",
+		"laddr": ":8020",
+		"fixrate": {
+			"AIRSKY":{
+				"MELON":{"rate":0.5,"min":100,"max":200000,"unit":20,"fee":15},
+				"MONECRE":{"rate":0.5,"min":100,"max":200000,"unit":20,"fee":20}
+			},
+			"MELON":{
+				"AIRSKY":{"rate":2.0,"min":100,"max":100000,"unit":10,"fee":5},
+				"MONECRE":{"rate":1.0,"min":100,"max":100000,"unit":10,"fee":5}
+			},
+			"MONECRE":{
+				"AIRSKY":{"rate":2.0,"min":100,"max":100000,"unit":10,"fee":10},
+				"MELON":{"rate":1.0,"min":100,"max":100000,"unit":10,"fee":10}
+			}
+		}
+	},
+	"dave": {
+		"rpcurl": "http://127.0.0.1:10030/",
+		"rpcuser": "user",
+		"rpcpass": "pass",
+		"laddr": ":8030",
+		"confidential": false
+	},
+	"fred": {
+		"rpcurl": "http://127.0.0.1:10040/",
+		"rpcuser": "user",
+		"rpcpass": "pass"
+	}
+}
