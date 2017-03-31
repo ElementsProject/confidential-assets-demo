@@ -30,7 +30,7 @@ function getStatus(status) {
     if (status == 1) {
         msg = "Paid";
     } else if (status == 0) {
-        msg = "Wait";
+        msg = "Waiting";
     } else if (status == -1) {
         msg = "Timeout";
     }
