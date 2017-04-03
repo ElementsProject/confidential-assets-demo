@@ -9,10 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"lib"
 	"log"
-	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -47,6 +45,72 @@ type SubmitResponse struct {
 type ErrorResponse struct {
 	Result  bool   `json:"result"`
 	Message string `json:"message"`
+}
+
+// Lock lists to keep referenced utxos (potentially to-be-spent)
+type LockList map[string]time.Time
+
+func (ll LockList) lock(txid string, vout int64) bool {
+	key := getLockingKey(txid, vout)
+	now := time.Now()
+	to := now.Add(utxoLockDuration)
+
+	old, ok := ll[key]
+	if !ok {
+		// new lock.
+		ll[key] = to
+		return true
+	}
+	if old.Sub(now) < 0 {
+		// exists but no longer locked. lock again.
+		ll[key] = to
+		return true
+	}
+
+	// already locked.
+	return false
+}
+
+func (ll LockList) unlock(txid string, vout int64) {
+	key := getLockingKey(txid, vout)
+	delete(ll, key)
+
+	return
+}
+
+func (ll LockList) sweep() {
+	now := time.Now()
+	for k, v := range ll {
+		if v.Sub(now) < 0 {
+			delete(ll, k)
+		}
+	}
+}
+
+type UnspentList []*rpc.Unspent
+
+func (ul UnspentList) Len() int {
+	return len(ul)
+}
+
+func (ul UnspentList) Swap(i, j int) {
+	ul[i], ul[j] = ul[j], ul[i]
+}
+
+func (ul UnspentList) Less(i, j int) bool {
+	if (*ul[i]).Amount < (*ul[j]).Amount {
+		return true
+	}
+	if (*ul[i]).Amount > (*ul[j]).Amount {
+		return false
+	}
+	return (*ul[i]).Confirmations < (*ul[j]).Confirmations
+}
+
+func unlockUnspentList(ul UnspentList) {
+	for _, u := range ul {
+		lockList.unlock(u.Txid, u.Vout)
+	}
 }
 
 type CyclicProcess struct {
@@ -379,92 +443,6 @@ func initialize() {
 	conf.GetInterface("fixrate", &fixedRateTable)
 }
 
-func stratHttpServer(laddr string, handlers map[string]func(url.Values, string) ([]byte, error), filepath string) (net.Listener, error) {
-	listener, err := net.Listen("tcp", laddr)
-	if err != nil {
-		logger.Println("net#Listen error:", err)
-		return listener, err
-	}
-
-	mux := http.NewServeMux()
-	for p, h := range handlers {
-		f := generateMuxHandler(h)
-		mux.HandleFunc(p, f)
-	}
-
-	mux.Handle("/", http.FileServer(http.Dir(filepath)))
-	logger.Println("start listening...", listener.Addr().Network(), listener.Addr())
-	go http.Serve(listener, mux)
-
-	return listener, err
-}
-
-func generateMuxHandler(h func(url.Values, string) ([]byte, error)) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		handler(w, r, h)
-		return
-	}
-}
-
-func handler(w http.ResponseWriter, r *http.Request, f func(url.Values, string) ([]byte, error)) {
-	w.Header().Add("Access-Control-Allow-Origin", "*")
-	w.Header().Add("Access-Control-Allow-Methods", "GET")
-	w.Header().Add("Access-Control-Allow-Headers", r.Header.Get("Access-Control-Request-Headers"))
-	w.Header().Add("Access-Control-Max-Age", "-1")
-
-	status := http.StatusOK
-	var res []byte
-	var err error
-	defer r.Body.Close()
-
-	switch r.Method {
-	case "GET":
-		r.ParseForm()
-		res, err = f(r.Form, "")
-
-	case "POST":
-		req, err := ioutil.ReadAll(r.Body)
-		defer r.Body.Close()
-		if err != nil {
-			status = http.StatusInternalServerError
-			logger.Println("ioutil#ReadAll error:", err)
-			_, _ = w.Write(nil)
-			return
-		}
-		res, err = f(nil, string(req))
-
-	default:
-		status = http.StatusMethodNotAllowed
-	}
-
-	if err != nil {
-		logger.Println("error:", err)
-		status = http.StatusInternalServerError
-		if res != nil {
-			res = createErrorByteArray(err)
-		}
-	}
-
-	w.WriteHeader(status)
-	_, err = w.Write(res)
-	if err != nil {
-		logger.Println("w#Write Error:", err)
-		return
-	}
-}
-
-func createErrorByteArray(e error) []byte {
-	if e == nil {
-		e = errors.New("error occured (fake)")
-	}
-	res := ErrorResponse{
-		Result:  false,
-		Message: fmt.Sprintf("%s", e),
-	}
-	b, _ := json.Marshal(res)
-	return b
-}
-
 func cyclicProcStart(cps []CyclicProcess) {
 	for _, cyclic := range cps {
 		go func() {
@@ -493,7 +471,7 @@ func main() {
 	initialize()
 
 	dir, _ := os.Getwd()
-	listener, err := stratHttpServer(localAddr, handlerList, dir+"/html/"+myActorName)
+	listener, err := lib.StartHttpServer(localAddr, handlerList, dir+"/html/"+myActorName)
 	defer listener.Close()
 	if err != nil {
 		logger.Println("error:", err)
