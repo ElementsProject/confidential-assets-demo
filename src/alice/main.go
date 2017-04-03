@@ -21,7 +21,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"rpc"
-	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -50,37 +49,6 @@ type UserWalletInfoRes struct {
 	Balance rpc.BalanceMap `json:"balance"`
 }
 
-type ExchangeOfferRequest struct {
-	Request map[string]int64 `json:"request"`
-	Offer   string           `json:"offer"`
-}
-
-type ExchangeOfferResponse struct {
-	Fee         int64  `json:"fee,string"`
-	AssetLabel  string `json:"assetid"`
-	Cost        int64  `json:"cost,string"`
-	Transaction string `json:"tx"`
-}
-
-func (u *ExchangeOfferResponse) getID() string {
-	tx := u.Transaction
-	now := time.Now().Unix()
-	nowba := make([]byte, binary.MaxVarintLen64)
-	binary.PutVarint(nowba, now)
-	target := append([]byte(tx), nowba...)
-	hash := sha256.Sum256(target)
-	id := fmt.Sprintf("%x", hash)
-	return id
-}
-
-type SubmitExchangeRequest struct {
-	Transaction string `json:"tx"`
-}
-
-type SubmitExchangeResponse struct {
-	TransactionId string `json:"txid"`
-}
-
 type Quotation struct {
 	RequestAsset  string
 	RequestAmount int64
@@ -102,22 +70,17 @@ func (e *Quotation) getID() string {
 	return id
 }
 
-type CyclicProcess struct {
-	handler  func()
-	interval int
-}
-
 const (
 	myActorName          = "alice"
 	defaultRpcURL        = "http://127.0.0.1:10000"
 	defaultRpcUser       = "user"
 	defaultPpcPass       = "pass"
-	defaultListen        = "8000"
+	defaultListen        = ":8000"
 	defaultTxPath        = "elements-tx"
 	defaultTxOption      = ""
 	defaultTimeout       = 600
 	exchangerName        = "charlie"
-	defaultCharlieListen = "8020"
+	defaultCharlieListen = ":8020"
 )
 
 var logger *log.Logger = log.New(os.Stdout, myActorName+":", log.LstdFlags+log.Lshortfile)
@@ -132,6 +95,8 @@ var elementsTxOption string
 var localAddr string
 var quotationList = make(map[string]Quotation)
 var exchangerConf = democonf.NewDemoConf(exchangerName)
+var exchangeRateURL string
+var exchangeOfferWBURL string
 var exchangeOfferURL string
 var exchangeSubmitURL string
 var confidential = false
@@ -142,7 +107,7 @@ var handlerList = map[string]func(url.Values, string) ([]byte, error){
 	"/send":       doSend,
 }
 
-var cyclics = []CyclicProcess{CyclicProcess{handler: lockList.Sweep, interval: 3}}
+var cyclics = []lib.CyclicProcess{lib.CyclicProcess{Handler: lockList.Sweep, Interval: 3}}
 
 func getMyBalance() (rpc.BalanceMap, error) {
 	wallet, err := getWalletInfo()
@@ -240,7 +205,7 @@ func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
 		if offerAsset == requestAsset {
 			continue
 		}
-		exchangeOffer, err := getexchangeoffer(requestAsset, requestAmount, offerAsset)
+		exchangeOffer, err := getexchangerate(requestAsset, requestAmount, offerAsset)
 		if err != nil {
 			continue
 		}
@@ -248,8 +213,8 @@ func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
 		offerByAsset := UserOfferResByAsset{
 			Fee:         exchangeOffer.Fee,
 			Cost:        exchangeOffer.Cost,
-			ID:          exchangeOffer.getID(),
-			Transaction: exchangeOffer.Transaction,
+			ID:          exchangeOffer.GetID(),
+			Transaction: "",
 		}
 		userOfferResponse[offerAsset] = offerByAsset
 		quotation.Offer[offerAsset] = offerByAsset
@@ -280,7 +245,8 @@ func appendTransactionInfo(sendToAddr string, sendAsset string, sendAmount int64
 	params = append(params, template)
 
 	for _, u := range utxos {
-		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10) + ":" + strconv.FormatInt(u.Amount, 10)
+		//		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10) + ":" + strconv.FormatInt(u.Amount, 10)
+		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10)
 		params = append(params, txin)
 	}
 
@@ -307,8 +273,67 @@ func appendTransactionInfo(sendToAddr string, sendAsset string, sendAmount int64
 	return txTemplate, nil
 }
 
+func appendTransactionInfoWB(sendToAddr string, sendAsset string, sendAmount int64, offerAsset string, offerDetail UserOfferResByAsset, utxos rpc.UnspentList, loopbackUtxos rpc.UnspentList) (string, error) {
+	template := offerDetail.Transaction
+	cost := offerDetail.Cost
+	fee := offerDetail.Fee
+	change := getAmount(utxos) - (cost + fee)
+	params := []string{}
+	lbChange := getAmount(loopbackUtxos)
+
+	if elementsTxOption != "" {
+		params = append(params, elementsTxOption)
+	}
+	params = append(params, template)
+
+	for _, u := range utxos {
+		//		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10) + ":" + strconv.FormatInt(u.Amount, 10)
+		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10)
+		params = append(params, txin)
+	}
+	for _, u := range loopbackUtxos {
+		//		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10) + ":" + strconv.FormatInt(u.Amount, 10)
+		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10)
+		params = append(params, txin)
+	}
+
+	if 0 < change {
+		addrChange, err := rpcClient.GetNewAddr(true)
+		if err != nil {
+			return "", err
+		}
+		outAddrChange := "outaddr=" + strconv.FormatInt(change, 10) + ":" + addrChange + ":" + assetIdMap[offerAsset]
+		params = append(params, outAddrChange)
+	}
+	if 0 < lbChange {
+		addrLbChange, err := rpcClient.GetNewAddr(true)
+		if err != nil {
+			return "", err
+		}
+		outAddrLbChange := "outaddr=" + strconv.FormatInt(lbChange, 10) + ":" + addrLbChange + ":" + assetIdMap[sendAsset]
+		params = append(params, outAddrLbChange)
+	}
+	outAddrSend := "outaddr=" + strconv.FormatInt(sendAmount, 10) + ":" + sendToAddr + ":" + assetIdMap[sendAsset]
+	params = append(params, outAddrSend)
+
+	logger.Println("=== tx-command param start ===")
+	for _, p := range params {
+		logger.Println(p)
+	}
+	logger.Println("=== tx-command param end ===")
+
+	out, err := exec.Command(elementsTxCommand, params...).Output()
+
+	if err != nil {
+		logger.Println("elements-tx error:", err, fmt.Sprintf("\n\tparams: %#v\n\toutput: %#v", params, out))
+		return "", err
+	}
+
+	txTemplate := strings.TrimRight(string(out), "\n")
+	return txTemplate, nil
+}
+
 func doSend(reqParam url.Values, reqBody string) ([]byte, error) {
-	logger.Println(fmt.Sprintf("doSend start. %#v", reqParam))
 	tmp, ok := reqParam["id"]
 	if !ok {
 		err := errors.New("no id found:")
@@ -335,103 +360,200 @@ func doSend(reqParam url.Values, reqBody string) ([]byte, error) {
 		logger.Println("error:", err)
 		return nil, err
 	}
+
+	isConfidential, err := isConfidential(tmp[0])
+	if err != nil {
+		logger.Println("error:", err)
+		return nil, err
+	}
+
 	sendToAddr := tmp[0]
 
-	estID := ""
-	found := false
-
-	var sendAsset string
-	var sendAmount int64
-	var offerAsset string
-	var offerDetail UserOfferResByAsset
-	for i, v := range quotationList {
-		for k, w := range v.Offer {
-			if w.ID == offerID {
-				offerAsset = k
-				offerDetail = w
-				found = true
-				break
-			}
-		}
-		if found {
-			sendAsset = v.RequestAsset
-			sendAmount = v.RequestAmount
-			estID = i
-			break
-		}
-	}
-
-	utxos, err := searchUnspent(offerAsset, offerDetail.Cost+offerDetail.Fee)
-	if err != nil {
-		logger.Println("error:", err)
-		return nil, err
-	}
-
-	tx, err := appendTransactionInfo(sendToAddr, sendAsset, sendAmount, offerAsset, offerDetail, utxos)
-	if err != nil {
-		logger.Println("error:", err)
-		return nil, err
-	}
-
-	var signedtx rpc.SignedTransaction
-	_, err = rpcClient.RequestAndUnmarshalResult(&signedtx, "signrawtransaction", tx)
-	if err != nil {
-		logger.Println("RPC/signrawtransaction error:", err, fmt.Sprintf("\n\tparam :%#v", tx))
-		return nil, err
-	}
-
 	var userSendResponse UserSendResponse
-	submitRes, err := submitexchange(signedtx.Hex)
-	if err != nil {
-		userSendResponse.Result = false
-		userSendResponse.Message = fmt.Sprintf("fail ADDR:%s TxID:%s\nerr:%#v", sendToAddr, offerID, err)
+	if isConfidential {
+		userSendResponse, err = doSendWithBlinding(offerID, sendToAddr)
+	} else {
+		userSendResponse, err = doSendWithNoBlinding(offerID, sendToAddr)
 	}
-	userSendResponse.Result = true
-	userSendResponse.Message = fmt.Sprintf("success ADDR:%s TxID:%s ", sendToAddr, submitRes.TransactionId)
-
-	delete(quotationList, estID)
-
-	lockList.UnlockUnspentList(utxos)
 
 	b, _ := json.Marshal(userSendResponse)
 	logger.Println("<<" + string(b))
 	return b, err
 }
 
-func searchUnspent(requestAsset string, requestAmount int64) (rpc.UnspentList, error) {
-	var totalAmount int64 = 0
-	var ul rpc.UnspentList
-	var utxos rpc.UnspentList = make(rpc.UnspentList, 0)
+func doSendWithBlinding(offerID string, sendToAddr string) (UserSendResponse, error) {
+	logger.Println(fmt.Sprintf("doSendWithBlinding start. (%s, %s)", offerID, sendToAddr))
 
-	_, err := rpcClient.RequestAndUnmarshalResult(&ul, "listunspent", 1, 9999999, []string{}, requestAsset)
+	var userSendResponse UserSendResponse
+
+	quotationID, offerAsset, err := getQuotation(quotationList, offerID)
 	if err != nil {
-		logger.Println("RPC/listunspent error:", err, fmt.Sprintf("\n\tparam :%#v", requestAsset))
-		return utxos, err
+		logger.Println("error:", err)
+		return userSendResponse, err
 	}
-	sort.Sort(sort.Reverse(ul))
 
-	for _, u := range ul {
-		if requestAmount < totalAmount {
+	offerDetail := quotationList[quotationID].Offer[offerAsset]
+	sendAsset := quotationList[quotationID].RequestAsset
+	sendAmount := quotationList[quotationID].RequestAmount
+
+	ofutxos, err := rpcClient.SearchUnspent(lockList, offerAsset, offerDetail.Cost+offerDetail.Fee, true)
+	if err != nil {
+		logger.Println("error:", err)
+		return userSendResponse, err
+	}
+	sautxos, err := rpcClient.SearchMinimalUnspent(lockList, sendAsset, true)
+	if err != nil {
+		logger.Println("error:", err)
+		return userSendResponse, err
+	}
+
+	cmutxos := append(ofutxos, sautxos...)
+	commitments, err := rpcClient.GetCommitments(cmutxos)
+	if err != nil {
+		logger.Println("error:", err)
+		return userSendResponse, err
+	}
+
+	exchangeOffer, err := getexchangeofferwb(sendAsset, sendAmount, offerAsset, commitments)
+	if err != nil {
+		logger.Println("error:", err)
+		return userSendResponse, err
+	}
+
+	if (offerDetail.Cost != exchangeOffer.Cost) ||
+		(offerDetail.Fee != exchangeOffer.Fee) {
+		err := fmt.Errorf("quatation has changed: old (cost:%d, fee:%d) => new (cost:%d, fee:%d)",
+			offerDetail.Cost, offerDetail.Fee, exchangeOffer.Cost, exchangeOffer.Fee)
+		logger.Println("error:", err)
+		return userSendResponse, err
+	}
+	offerDetail.ID = exchangeOffer.GetID()
+	offerDetail.Transaction = exchangeOffer.Transaction
+	commitments = append(exchangeOffer.Commitments, commitments...)
+
+	tx, err := appendTransactionInfoWB(sendToAddr, sendAsset, sendAmount, offerAsset, offerDetail, ofutxos, sautxos)
+	if err != nil {
+		logger.Println("error:", err)
+		return userSendResponse, err
+	}
+
+	blindtx, _, err := rpcClient.RequestAndCastString("blindrawtransaction", tx, commitments)
+	if err != nil {
+		logger.Println("RPC/blindrawtransaction error:", err, fmt.Sprintf("\n\tparam :%#v", tx))
+		return userSendResponse, err
+	}
+
+	var signedtx rpc.SignedTransaction
+	_, err = rpcClient.RequestAndUnmarshalResult(&signedtx, "signrawtransaction", blindtx)
+	if err != nil {
+		logger.Println("RPC/signrawtransaction error:", err, fmt.Sprintf("\n\tparam :%#v", blindtx))
+		return userSendResponse, err
+	}
+
+	submitRes, err := submitexchange(signedtx.Hex)
+	if err != nil {
+		userSendResponse.Result = false
+		userSendResponse.Message = fmt.Sprintf("fail ADDR:%s TxID:%s\nerr:%#v", sendToAddr, offerID, err)
+	} else {
+		userSendResponse.Result = true
+		userSendResponse.Message = fmt.Sprintf("success ADDR:%s TxID:%s ", sendToAddr, submitRes.TransactionId)
+	}
+
+	delete(quotationList, quotationID)
+
+	lockList.UnlockUnspentList(cmutxos)
+
+	return userSendResponse, err
+}
+
+func doSendWithNoBlinding(offerID string, sendToAddr string) (UserSendResponse, error) {
+	logger.Println(fmt.Sprintf("doSendWithNoBlinding start. (%s, %s)", offerID, sendToAddr))
+
+	var userSendResponse UserSendResponse
+
+	quotationID, offerAsset, err := getQuotation(quotationList, offerID)
+	if err != nil {
+		logger.Println("error:", err)
+		return userSendResponse, err
+	}
+
+	offerDetail := quotationList[quotationID].Offer[offerAsset]
+	sendAsset := quotationList[quotationID].RequestAsset
+	sendAmount := quotationList[quotationID].RequestAmount
+
+	exchangeOffer, err := getexchangeoffer(sendAsset, sendAmount, offerAsset)
+	if err != nil {
+		logger.Println("error:", err)
+		return userSendResponse, err
+	}
+
+	if (offerDetail.Cost != exchangeOffer.Cost) ||
+		(offerDetail.Fee != exchangeOffer.Fee) {
+		err := fmt.Errorf("quatation has changed: old (cost:%d, fee:%d) => new (cost:%d, fee:%d)",
+			offerDetail.Cost, offerDetail.Fee, exchangeOffer.Cost, exchangeOffer.Fee)
+		logger.Println("error:", err)
+		return userSendResponse, err
+	}
+	offerDetail.ID = exchangeOffer.GetID()
+	offerDetail.Transaction = exchangeOffer.Transaction
+
+	utxos, err := rpcClient.SearchUnspent(lockList, offerAsset, offerDetail.Cost+offerDetail.Fee, false)
+	if err != nil {
+		logger.Println("error:", err)
+		return userSendResponse, err
+	}
+
+	tx, err := appendTransactionInfo(sendToAddr, sendAsset, sendAmount, offerAsset, offerDetail, utxos)
+	if err != nil {
+		logger.Println("error:", err)
+		return userSendResponse, err
+	}
+
+	var signedtx rpc.SignedTransaction
+	_, err = rpcClient.RequestAndUnmarshalResult(&signedtx, "signrawtransaction", tx)
+	if err != nil {
+		logger.Println("RPC/signrawtransaction error:", err, fmt.Sprintf("\n\tparam :%#v", tx))
+		return userSendResponse, err
+	}
+
+	submitRes, err := submitexchange(signedtx.Hex)
+	if err != nil {
+		userSendResponse.Result = false
+		userSendResponse.Message = fmt.Sprintf("fail ADDR:%s TxID:%s\nerr:%#v", sendToAddr, offerID, err)
+	} else {
+		userSendResponse.Result = true
+		userSendResponse.Message = fmt.Sprintf("success ADDR:%s TxID:%s ", sendToAddr, submitRes.TransactionId)
+	}
+
+	delete(quotationList, quotationID)
+
+	lockList.UnlockUnspentList(utxos)
+
+	return userSendResponse, err
+}
+
+func getQuotation(ql map[string]Quotation, offerID string) (string, string, error) {
+	var quotationID string
+	var offerAsset string
+	var found bool = false
+
+	for i, v := range ql {
+		for k, w := range v.Offer {
+			if w.ID == offerID {
+				offerAsset = k
+				found = true
+				break
+			}
+		}
+		if found {
+			quotationID = i
 			break
 		}
-		if !lockList.Lock(u.Txid, u.Vout) {
-			continue
-		}
-		if !(u.Spendable || u.Solvable) {
-			continue
-		}
-		totalAmount += u.Amount
-		utxos = append(utxos, u)
 	}
-
-	if requestAmount >= totalAmount {
-		lockList.UnlockUnspentList(utxos)
-		err = errors.New("no sufficient utxo found")
-		logger.Println("error:", err)
-		return utxos, err
+	if !found {
+		return "", "", fmt.Errorf("offerID not found [%s]", offerID)
 	}
-
-	return utxos, nil
+	return quotationID, offerAsset, nil
 }
 
 func getLockingKey(txid string, vout int64) string {
@@ -460,9 +582,60 @@ func getWalletInfo() (rpc.Wallet, error) {
 	return walletInfo, nil
 }
 
-func getexchangeoffer(requestAsset string, requestAmount int64, offerAsset string) (ExchangeOfferResponse, error) {
-	var offerRes ExchangeOfferResponse
-	var offerReq ExchangeOfferRequest
+func isConfidential(addr string) (bool, error) {
+	var validAddr rpc.ValidatedAddress
+
+	_, err := rpcClient.RequestAndUnmarshalResult(&validAddr, "validateaddress", addr)
+	if err != nil {
+		return false, err
+	}
+
+	if validAddr.IsValid == false {
+		return false, fmt.Errorf("invalid address [%s]", addr)
+	}
+
+	if addr == validAddr.Unconfidential {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func getexchangerate(requestAsset string, requestAmount int64, offerAsset string) (lib.ExchangeRateResponse, error) {
+	var rateRes lib.ExchangeRateResponse
+	var rateReq lib.ExchangeRateRequest
+	rateReq.Request = make(map[string]int64)
+	rateReq.Request[requestAsset] = requestAmount
+	rateReq.Offer = offerAsset
+
+	_, err := callExchangerAPI(exchangeRateURL, rateReq, &rateRes)
+
+	if err != nil {
+		logger.Println("json#Marshal error:", err)
+		logger.Println("----:%#v", rateRes)
+	}
+	return rateRes, err
+}
+
+func getexchangeofferwb(requestAsset string, requestAmount int64, offerAsset string, commitments []string) (lib.ExchangeOfferWBResponse, error) {
+	var offerRes lib.ExchangeOfferWBResponse
+	var offerReq lib.ExchangeOfferWBRequest
+	offerReq.Request = make(map[string]int64)
+	offerReq.Request[requestAsset] = requestAmount
+	offerReq.Offer = offerAsset
+	offerReq.Commitments = commitments
+
+	_, err := callExchangerAPI(exchangeOfferWBURL, offerReq, &offerRes)
+
+	if err != nil {
+		logger.Println("json#Marshal error:", err)
+	}
+	return offerRes, err
+}
+
+func getexchangeoffer(requestAsset string, requestAmount int64, offerAsset string) (lib.ExchangeOfferResponse, error) {
+	var offerRes lib.ExchangeOfferResponse
+	var offerReq lib.ExchangeOfferRequest
 	offerReq.Request = make(map[string]int64)
 	offerReq.Request[requestAsset] = requestAmount
 	offerReq.Offer = offerAsset
@@ -475,9 +648,9 @@ func getexchangeoffer(requestAsset string, requestAmount int64, offerAsset strin
 	return offerRes, err
 }
 
-func submitexchange(tx string) (SubmitExchangeResponse, error) {
-	var submitReq SubmitExchangeRequest
-	var submitRes SubmitExchangeResponse
+func submitexchange(tx string) (lib.SubmitExchangeResponse, error) {
+	var submitReq lib.SubmitExchangeRequest
+	var submitRes lib.SubmitExchangeResponse
 	submitReq.Transaction = tx
 
 	_, err := callExchangerAPI(exchangeSubmitURL, submitReq, &submitRes)
@@ -523,6 +696,7 @@ func callExchangerAPI(targetUrl string, param interface{}, result interface{}) (
 
 func initialize() {
 	logger = log.New(os.Stdout, myActorName+":", log.LstdFlags+log.Lshortfile)
+	lib.SetLogger(logger)
 
 	rpcClient = rpc.NewRpc(
 		conf.GetString("rpcurl", defaultRpcURL),
@@ -539,20 +713,22 @@ func initialize() {
 	elementsTxOption = conf.GetString("txoption", defaultTxOption)
 	utxoLockDuration = time.Duration(int64(conf.GetNumber("timeout", defaultTimeout))) * time.Second
 
+	exchangeRateURL = "http://127.0.0.1" + exchangerConf.GetString("laddr", defaultCharlieListen) + "/getexchangerate/"
+	exchangeOfferWBURL = "http://127.0.0.1" + exchangerConf.GetString("laddr", defaultCharlieListen) + "/getexchangeofferwb/"
 	exchangeOfferURL = "http://127.0.0.1" + exchangerConf.GetString("laddr", defaultCharlieListen) + "/getexchangeoffer/"
 	exchangeSubmitURL = "http://127.0.0.1" + exchangerConf.GetString("laddr", defaultCharlieListen) + "/submitexchange/"
 }
 
-func cyclicProcStart(cps []CyclicProcess) {
+func cyclicProcStart(cps []lib.CyclicProcess) {
 	for _, cyclic := range cps {
 		go func() {
-			fmt.Println("Loop interval:", cyclic.interval)
+			fmt.Println("Loop interval:", cyclic.Interval)
 			for {
-				time.Sleep(time.Duration(cyclic.interval) * time.Second)
+				time.Sleep(time.Duration(cyclic.Interval) * time.Second)
 				if stop {
 					break
 				}
-				cyclic.handler()
+				cyclic.Handler()
 			}
 		}()
 	}

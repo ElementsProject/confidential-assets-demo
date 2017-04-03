@@ -16,7 +16,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"rpc"
-	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -31,27 +30,6 @@ type ExchangeRateTuple struct {
 	Fee  int64   `json:"fee,"`
 }
 
-type OfferResponse struct {
-	Fee         int64  `json:"fee,string"`
-	AssetLabel  string `json:"assetid"`
-	Cost        int64  `json:"cost,string"`
-	Transaction string `json:"tx"`
-}
-
-type SubmitResponse struct {
-	TransactionId string `json:"txid"`
-}
-
-type ErrorResponse struct {
-	Result  bool   `json:"result"`
-	Message string `json:"message"`
-}
-
-type CyclicProcess struct {
-	handler  func()
-	interval int
-}
-
 const (
 	myActorName     = "charlie"
 	defaultRateFrom = "AKISKY"
@@ -59,7 +37,7 @@ const (
 	defaultRpcURL   = "http://127.0.0.1:10020"
 	defaultRpcUser  = "user"
 	defaultPpcPass  = "pass"
-	defaultListen   = "8020"
+	defaultListen   = ":8020"
 	defaultTxPath   = "elements-tx"
 	defaultTxOption = ""
 	defaultTimeout  = 600
@@ -78,11 +56,13 @@ var defaultRateTuple ExchangeRateTuple = ExchangeRateTuple{Rate: 0.5, Min: 100, 
 var fixedRateTable = make(map[string](map[string]ExchangeRateTuple))
 
 var handlerList = map[string]func(url.Values, string) ([]byte, error){
-	"/getexchangeoffer/": doOffer,
-	"/submitexchange/":   doSubmit,
+	"/getexchangerate/":    doGetRate,
+	"/getexchangeofferwb/": doOfferWithBlinding,
+	"/getexchangeoffer/":   doOffer,
+	"/submitexchange/":     doSubmit,
 }
 
-var cyclics = []CyclicProcess{CyclicProcess{handler: lockList.Sweep, interval: 3}}
+var cyclics = []lib.CyclicProcess{lib.CyclicProcess{Handler: lockList.Sweep, Interval: 3}}
 
 func getReqestBodyMap(reqBody string) (map[string]interface{}, error) {
 	var reqBodyMap interface{}
@@ -101,6 +81,145 @@ func getReqestBodyMap(reqBody string) (map[string]interface{}, error) {
 		logger.Println("error:", err)
 	}
 	return nil, err
+}
+
+func doGetRate(reqParam url.Values, reqBody string) ([]byte, error) {
+	var requestAsset string
+	var requestAmount int64
+
+	rateReqMap, err := getReqestBodyMap(reqBody)
+	if err != nil {
+		logger.Println("error:", err)
+		return nil, err
+	}
+
+	tmp, ok := rateReqMap["request"]
+	request := tmp.(map[string]interface{})
+	if len(request) != 1 {
+		err = errors.New("request must single record:" + fmt.Sprintf("%d", len(request)))
+		logger.Println("error:", err)
+		return nil, err
+	}
+	for k, v := range request {
+		requestAsset = k
+		requestAmount = int64(v.(float64))
+	}
+
+	tmp, ok = rateReqMap["offer"]
+	if !ok {
+		err = errors.New("offer not found.")
+		logger.Println("error:", err)
+		b, _ := json.Marshal(fmt.Sprintf("%v", err))
+		return b, nil
+	}
+
+	offer, ok := tmp.(string)
+	if !ok {
+		err = errors.New("type of offer is not a string:" + fmt.Sprintf("%s", tmp))
+		logger.Println("error:", err)
+		return nil, err
+	}
+
+	// 1. lookup config
+	rateRes, err := lookupRate(requestAsset, requestAmount, offer)
+	if err != nil {
+		logger.Println("error:", err)
+		b, _ := json.Marshal(fmt.Sprintf("%v", err))
+		return b, nil
+	}
+
+	b, err := json.Marshal(rateRes)
+	if err != nil {
+		logger.Println("json#Marshal error:", err)
+		return nil, err
+	}
+
+	logger.Println("<<" + string(b))
+	return b, nil
+}
+
+func doOfferWithBlinding(reqParam url.Values, reqBody string) ([]byte, error) {
+	var requestAsset string
+	var requestAmount int64
+	var offerRequest lib.ExchangeOfferWBRequest
+
+	err := json.Unmarshal([]byte(reqBody), &offerRequest)
+	if err != nil {
+		logger.Println("json#Unmarshal error:", err)
+		return nil, err
+	}
+	request := offerRequest.Request
+	if len(request) != 1 {
+		err = errors.New("request must single record:" + fmt.Sprintf("%d", len(request)))
+		logger.Println("error:", err)
+		return nil, err
+	}
+	for k, v := range request {
+		requestAsset = k
+		requestAmount = v
+	}
+
+	offer := offerRequest.Offer
+	commitments := offerRequest.Commitments
+
+	// 1. lookup rate
+	offerRes, err := lookupRate(requestAsset, requestAmount, offer)
+	if err != nil {
+		logger.Println("error:", err)
+		b, _ := json.Marshal(fmt.Sprintf("%v", err))
+		return b, nil
+	}
+
+	// 2. lookup unspent
+	utxos, err := rpcClient.SearchUnspent(lockList, requestAsset, requestAmount, true)
+	if err != nil {
+		logger.Println("error:", err)
+		return nil, err
+	}
+	rautxos, err := rpcClient.SearchMinimalUnspent(lockList, offer, true)
+	if err != nil {
+		logger.Println("error:", err)
+		return nil, err
+	}
+
+	// 3. creat tx
+	tx, err := createTransactionTemplateWB(requestAsset, requestAmount, offer, offerRes, utxos, rautxos)
+	if err != nil {
+		logger.Println("error:", err)
+		return nil, err
+	}
+
+	// 4. blinding
+	cmutxos := append(utxos, rautxos...)
+	resCommitments, err := rpcClient.GetCommitments(cmutxos)
+	if err != nil {
+		logger.Println("error:", err)
+		return nil, err
+	}
+	commitments = append(resCommitments, commitments...)
+
+	blindtx, _, err := rpcClient.RequestAndCastString("blindrawtransaction", tx, commitments)
+	if err != nil {
+		logger.Println("RPC/blindrawtransaction error:", err, fmt.Sprintf("\n\tparam :%#v", tx))
+		return nil, err
+	}
+
+	offerWBRes := lib.ExchangeOfferWBResponse{
+		Fee:         offerRes.Fee,
+		AssetLabel:  offerRes.AssetLabel,
+		Cost:        offerRes.Cost,
+		Transaction: blindtx,
+		Commitments: resCommitments,
+	}
+
+	b, err := json.Marshal(offerWBRes)
+	if err != nil {
+		logger.Println("json#Marshal error:", err)
+		return nil, err
+	}
+
+	logger.Println("<<" + string(b))
+	return b, nil
 }
 
 func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
@@ -149,7 +268,7 @@ func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
 	}
 
 	// 2. lookup unspent
-	utxos, err := searchUnspent(requestAsset, requestAmount)
+	utxos, err := rpcClient.SearchUnspent(lockList, requestAsset, requestAmount, false)
 	if err != nil {
 		logger.Println("error:", err)
 		return nil, err
@@ -188,7 +307,8 @@ func createTransactionTemplate(requestAsset string, requestAmount int64, offer s
 	params = append(params, "-create")
 
 	for _, u := range utxos {
-		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10) + ":" + strconv.FormatInt(u.Amount, 10)
+		//		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10) + ":" + strconv.FormatInt(u.Amount, 10)
+		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10)
 		params = append(params, txin)
 	}
 
@@ -203,6 +323,64 @@ func createTransactionTemplate(requestAsset string, requestAmount int64, offer s
 		outAddrChange := "outaddr=" + strconv.FormatInt(change, 10) + ":" + addrChange + ":" + assetIdMap[requestAsset]
 		params = append(params, outAddrChange)
 	}
+
+	out, err := exec.Command(elementsTxCommand, params...).Output()
+
+	if err != nil {
+		logger.Println("elements-tx error:", err, fmt.Sprintf("\n\tparams: %#v\n\toutput: %#v", params, out))
+		return "", err
+	}
+
+	txTemplate := strings.TrimRight(string(out), "\n")
+	return txTemplate, nil
+}
+
+func createTransactionTemplateWB(requestAsset string, requestAmount int64, offer string, offerRes lib.ExchangeOfferResponse, utxos rpc.UnspentList, loopbackUtxos rpc.UnspentList) (string, error) {
+	change := getAmount(utxos) - requestAmount
+	lbChange := getAmount(loopbackUtxos) + offerRes.Cost
+
+	addrOffer, err := rpcClient.GetNewAddr(true)
+	if err != nil {
+		return "", err
+	}
+
+	params := []string{}
+
+	if elementsTxOption != "" {
+		params = append(params, elementsTxOption)
+	}
+	params = append(params, "-create")
+
+	for _, u := range utxos {
+		//		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10) + ":" + strconv.FormatInt(u.Amount, 10)
+		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10)
+		params = append(params, txin)
+	}
+	for _, u := range loopbackUtxos {
+		//		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10) + ":" + strconv.FormatInt(u.Amount, 10)
+		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10)
+		params = append(params, txin)
+	}
+
+	outAddrOffer := "outaddr=" + strconv.FormatInt(lbChange, 10) + ":" + addrOffer + ":" + assetIdMap[offer]
+	params = append(params, outAddrOffer)
+
+	if 0 < change {
+		addrChange, err := rpcClient.GetNewAddr(true)
+		if err != nil {
+			return "", err
+		}
+		outAddrChange := "outaddr=" + strconv.FormatInt(change, 10) + ":" + addrChange + ":" + assetIdMap[requestAsset]
+		params = append(params, outAddrChange)
+	}
+	outAddrFee := "outscript=" + strconv.FormatInt(offerRes.Fee, 10) + "::" + assetIdMap[offer]
+	params = append(params, outAddrFee)
+
+	logger.Println("=== tx-command param start ===")
+	for _, p := range params {
+		logger.Println(p)
+	}
+	logger.Println("=== tx-command param end ===")
 
 	out, err := exec.Command(elementsTxCommand, params...).Output()
 
@@ -258,7 +436,7 @@ func doSubmit(rreqParam url.Values, reqBody string) ([]byte, error) {
 		return nil, err
 	}
 
-	submitRes := SubmitResponse{
+	submitRes := lib.SubmitExchangeResponse{
 		TransactionId: txid,
 	}
 
@@ -271,8 +449,8 @@ func doSubmit(rreqParam url.Values, reqBody string) ([]byte, error) {
 	return b, nil
 }
 
-func lookupRate(requestAsset string, requestAmount int64, offer string) (OfferResponse, error) {
-	var offerRes OfferResponse
+func lookupRate(requestAsset string, requestAmount int64, offer string) (lib.ExchangeOfferResponse, error) {
+	var offerRes lib.ExchangeOfferResponse
 
 	rateMap, ok := fixedRateTable[offer]
 	if !ok {
@@ -300,7 +478,7 @@ func lookupRate(requestAsset string, requestAmount int64, offer string) (OfferRe
 		return offerRes, err
 	}
 
-	offerRes = OfferResponse{
+	offerRes = lib.ExchangeOfferResponse{
 		Fee:         rate.Fee,
 		Transaction: "",
 		AssetLabel:  offer,
@@ -308,42 +486,6 @@ func lookupRate(requestAsset string, requestAmount int64, offer string) (OfferRe
 	}
 
 	return offerRes, nil
-}
-
-func searchUnspent(requestAsset string, requestAmount int64) (rpc.UnspentList, error) {
-	var totalAmount int64 = 0
-	var ul rpc.UnspentList
-	var utxos rpc.UnspentList = make(rpc.UnspentList, 0)
-
-	_, err := rpcClient.RequestAndUnmarshalResult(&ul, "listunspent", 1, 9999999, []string{}, requestAsset)
-	if err != nil {
-		logger.Println("RPC/listunspent error:", err, fmt.Sprintf("\n\tparam :%#v", requestAsset))
-		return utxos, err
-	}
-	sort.Sort(sort.Reverse(ul))
-
-	for _, u := range ul {
-		if requestAmount < totalAmount {
-			break
-		}
-		if !lockList.Lock(u.Txid, u.Vout) {
-			continue
-		}
-		if !(u.Spendable || u.Solvable) {
-			continue
-		}
-		totalAmount += u.Amount
-		utxos = append(utxos, u)
-	}
-
-	if requestAmount >= totalAmount {
-		lockList.UnlockUnspentList(utxos)
-		err = errors.New("no sufficient utxo")
-		logger.Println("error:", err)
-		return utxos, err
-	}
-
-	return utxos, nil
 }
 
 func getAmount(ul rpc.UnspentList) int64 {
@@ -358,6 +500,7 @@ func getAmount(ul rpc.UnspentList) int64 {
 
 func initialize() {
 	logger = log.New(os.Stdout, myActorName+":", log.LstdFlags+log.Lshortfile)
+	lib.SetLogger(logger)
 
 	rpcClient = rpc.NewRpc(
 		conf.GetString("rpcurl", defaultRpcURL),
@@ -377,16 +520,16 @@ func initialize() {
 	conf.GetInterface("fixrate", &fixedRateTable)
 }
 
-func cyclicProcStart(cps []CyclicProcess) {
+func cyclicProcStart(cps []lib.CyclicProcess) {
 	for _, cyclic := range cps {
 		go func() {
-			fmt.Println("Loop interval:", cyclic.interval)
+			fmt.Println("Loop interval:", cyclic.Interval)
 			for {
-				time.Sleep(time.Duration(cyclic.interval) * time.Second)
+				time.Sleep(time.Duration(cyclic.Interval) * time.Second)
 				if stop {
 					break
 				}
-				cyclic.handler()
+				cyclic.Handler()
 			}
 		}()
 	}
