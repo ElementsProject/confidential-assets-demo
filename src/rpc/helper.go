@@ -9,7 +9,18 @@ package rpc
 
 import (
 	"fmt"
+	"time"
 )
+
+// Lock lists to keep referenced utxos (potentially to-be-spent)
+
+type LockList map[string]time.Time
+
+var utxoLockDuration time.Duration
+
+func SetUtxoLockDuration(utxoLockDurationIn time.Duration) {
+	utxoLockDuration = utxoLockDurationIn
+}
 
 func (ul UnspentList) Len() int {
 	return len(ul)
@@ -28,6 +39,55 @@ func (ul UnspentList) Less(i, j int) bool {
 	}
 	return (*ul[i]).Confirmations < (*ul[j]).Confirmations
 }
+
+func getLockingKey(txid string, vout int64) string {
+	return fmt.Sprintf("%s:%d", txid, vout)
+}
+
+func (ll LockList) Lock(txid string, vout int64) bool {
+	key := getLockingKey(txid, vout)
+	now := time.Now()
+	to := now.Add(utxoLockDuration)
+
+	old, ok := ll[key]
+	if !ok {
+		// new lock.
+		ll[key] = to
+		return true
+	}
+	if old.Sub(now) < 0 {
+		// exists but no longer locked. lock again.
+		ll[key] = to
+		return true
+	}
+
+	// already locked.
+	return false
+}
+
+func (ll LockList) Unlock(txid string, vout int64) {
+	key := getLockingKey(txid, vout)
+	delete(ll, key)
+
+	return
+}
+
+func (ll LockList) Sweep() {
+	now := time.Now()
+	for k, v := range ll {
+		if v.Sub(now) < 0 {
+			delete(ll, k)
+		}
+	}
+}
+
+func (ll LockList) UnlockUnspentList(ul UnspentList) {
+	for _, u := range ul {
+		ll.Unlock(u.Txid, u.Vout)
+	}
+}
+
+
 
 func (rpc* Rpc) GetNewAddr(confidential bool) (string, error) {
 	var validAddr ValidatedAddress
