@@ -38,7 +38,7 @@ const interval = 3 * time.Second
 
 var rpcurl string = "http://127.0.0.1:10010"
 var rpcuser string = "user"
-var rpcpass = "pass"
+var rpcpass string = "pass"
 
 var rpcClient *rpc.Rpc
 
