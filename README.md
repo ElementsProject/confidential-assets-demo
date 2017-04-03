@@ -50,8 +50,9 @@ in the path. E.g. by doing `export PATH=$PATH:/home/me/workspace/elements/src` o
 4. Starts up the appropriate demo-specific daemons.
 
 After this, open two pages in a web browser:
-- http://localhost:8000 (the customer Alice's UI)
-- http://localhost:8030 (the merchant Dave's UI)
+- http://127.0.0.1:8000/ (the customer Alice's UI)
+- http://127.0.0.1:8030/order.html (the merchant Dave's order page)
+- http://127.0.0.1:8030/list.html (the merchant Dave's admin page)
 
 The idea is that Dave presents Alice with his UI, and Alice uses her UI (some app) to perform the
 exchange.
