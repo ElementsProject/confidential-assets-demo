@@ -58,7 +58,7 @@ type Wallet struct {
 	UnconfirmedBalance BalanceMap `json:"unconfirmed_balance"` // : xxx,         (numeric) the total unconfirmed balance of the wallet in BTC
 	ImmatureBalance    BalanceMap `json:"immature_balance"`    // : xxxxxx,      (numeric) the total immature balance of the wallet in BTC
 	TxCount            int64      `json:"txcount"`             // : xxxxxxx,     (numeric) the total number of transactions in the wallet
-	KeypoolOldest      int64      `json:"keypoololdest"`       // : xxxxxx,      (numeric) the timestamp (seconds since GMT epoch) of the oldest pre-generated key in the key pool
+	KeypoolOldest      float64    `json:"keypoololdest"`       // : xxxxxx,      (numeric) the timestamp (seconds since GMT epoch) of the oldest pre-generated key in the key pool
 	KeypoolSize        int64      `json:"keypoolsize"`         // : xxxx,        (numeric) how many new keys are pre-generated
 	UnlockedUntil      int64      `json:"unlocked_until"`      // : ttt,         (numeric) the timestamp in seconds since epoch (midnight Jan 1 1970 GMT) that the wallet is unlocked for transfers, or 0 if the wallet is locked
 	PayTxFee           int64      `json:"paytxfee"`            // : x.xxxx,      (numeric) the transaction fee configuration, set in BTC/kB
