@@ -1,169 +1,217 @@
-* {
-    font-size: 18pt;
+body {
+  color: #707172;
 }
 
-div {
-    padding: 0px;
-    margin: 0px;
+#walletbody {
+  background-color: #EEEFF0;
+  width: 640px;
 }
 
-div.page {
-    width: 800px;
-    margin: 0 auto;
+#headerrow {
+  background-color: white;
+  color: rgb(89,87,87);
+  padding-top: 30px;
+  padding-bottom: 30px;
+  background-color: #FEFFFF;
 }
 
-div.logo {
-    height: 2em;
-    text-align: center;
-    line-height: 2em;
-    border: 2px solid gray;
+#titletext {
+  color: white;
+  font-size: 1.2em;
+  font-weight: bold;
+  background-color: rgb(89,87,87);
+  margin-top: 30px;
+  padding-top: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  margin-right: 10px;
+  border-radius: 20px;
 }
 
-#wallet {
-    text-align: left;
-    padding-left: 15%;
-    padding-top: 1em;
-    padding-bottom: 1em;
-    line-height: 1.5em;
-    border: 2px solid gray;
-    display: none;
+.addressdetail {
+  background-color: #EEEFF0;
+  padding-left: 40px;
+  padding-right: 40px;
+  padding-top: 30px;
+  padding-bottom: 30px;
 }
 
-div.wtitle {
-    font-size: 20pt;
-    line-height: 1.5em;
-    padding-left: 2em;
+#addressinput {
+  height: 50px;
+  width: 80%;
+  font-size: 1.2em;
+  font-weight: bold;
 }
 
-td.lname {
-    width: 200px;
-    max-width: 200px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+/* Modal */
+
+.modal {
+  color: white;
+  display: none;
+  position: fixed;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  background-color: #000000;
+  background-color: rgba(0,0,0,0.8);
 }
 
-#scan {
-    text-align: left;
-    padding-left: 15%;
-    padding-top: 1em;
-    padding-bottom: 1em;
-    line-height: 2em;
-    border: 2px solid gray;
-    display: none;
+.modal-content {
+  background-color: #000000;
+  top: 20%;
+  padding: 10px;
+  border: 1px solid #FFFFFF;
+  width: 50%;
 }
 
-button.sbtn {
-    cursor: not-allowed;
-    width: 200px;
-    line-height: 1.5em;
-    border-radius: 0.25em;
-    border: 1px solid gray;
-    background: lightgray;
+#addressline {
+  height: 3px;
 }
 
-input {
-    width: 18em;
-    line-height: 1.5em;
-    border-radius: 0.25em;
-    border: 2px solid gray;
-}
-
-
-#info {
-    text-align: left;
-    padding-left: 15%;
-    padding-top: 1em;
-    padding-bottom: 1em;
-    line-height: 2em;
-    border: 2px solid gray;
-    display: none;
-}
-
-div.title {
-    font-size: 20pt;
-    line-height: 1.5em;
-}
-
-#pay {
-    text-align: left;
-    padding-left: 15%;
-    padding-top: 1em;
-    padding-bottom: 1em;
-    line-height: 2em;
-    border: 2px solid gray;
-    display: none;
-}
-
-button.possible {
-    cursor: pointer;
-    width: 200px;
-    line-height: 1.5em;
-    border-radius: 0.25em;
-    border: 1px solid gray;
-    background: white;
-}
-
-button.impossible {
-    cursor: not-allowed;
-    width: 200px;
-    line-height: 1.5em;
-    border-radius: 0.25em;
-    border: 1px solid gray;
-    background: dimgray;
-}
-
-td.impossible {
-    color: red;
-}
-
-#modal-overlay {
-    width: 100%;
-    height: 100%;
-    left: 0px;
-    top: 0px;
-    background: rgba(255, 255, 255, 0.4) ;
-    position: fixed;
-    z-index: 1;
-    text-align: center;
-    display: none;
-}
-
-#modal-content {
-    width: 600px;
-    margin: auto 10px;
-    background: white ;
-    border: 2px solid gray ;
-    position: relative;
-    display: inline-block;
-}
-
-#modal-confirm {
-    margin: 30px 0px;
-    width: 100%;
-}
-
-#modal-thank {
-    width: 600px;
-    height: 400px;
-    line-height: 400px;
-    display: none;
+#qr_sorry {
+  color: #EEEFF0;
 }
 
 button.cancel {
-    cursor: pointer;
-    width: 200px;
-    line-height: 1.5em;
-    border-radius: 0.25em;
-    border: 1px solid gray;
-    background: lightgray;
+  width: 100%;
+  background-color: white;
+  color: rgb(50,50,50);
 }
 
 button.ok {
-    cursor: pointer;
-    width: 200px;
-    line-height: 1.5em;
-    border-radius: 0.25em;
-    border: 1px solid gray;
-    background: gold;
+  width: 100%;
+  background-color: rgb(3,230,200);
+  color: rgb(50,50,50);
+}
+
+/* Point containers */
+
+.point {
+  background-color: rgb(3,230,200);
+  margin-left: 5%;
+  width: 90%;
+  padding-top: 30px;
+  padding-bottom: 30px;
+}
+
+.pointseparator {
+  margin-left: 7%;
+  width: 86%;
+  background-color: rgb(3,230,200);
+  border-top-style: dashed;
+  border-top-color: white;
+  border-top-width: 2px;
+}
+
+.toppoint {
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  background:
+    linear-gradient(315deg, transparent 10px, rgb(3,230,200) 0) bottom right,
+    linear-gradient(45deg,  transparent 10px, rgb(3,230,200) 0) bottom left;
+  background-size: 50% 100%;
+	background-repeat: no-repeat;
+  background-image:
+    radial-gradient(circle at 100% 100%, rgba(3,230,200,0) 14px, rgb(3,230,200) 15px),
+    radial-gradient(circle at 0 100%, rgba(3,230,200,0) 14px, rgb(3,230,200) 15px);
+}
+
+.middlepoint {
+  background:
+    linear-gradient(135deg, transparent 10px, rgb(3,230,200) 0) top left,
+    linear-gradient(225deg, transparent 10px, rgb(3,230,200) 0) top right,
+    linear-gradient(315deg, transparent 10px, rgb(3,230,200) 0) bottom right,
+    linear-gradient(45deg,  transparent 10px, rgb(3,230,200) 0) bottom left;
+  background-size: 50% 50%;
+	background-repeat: no-repeat;
+  background-image:
+    radial-gradient(circle at 0 0, rgba(3,230,200,0) 14px, rgb(3,230,200) 15px),
+    radial-gradient(circle at 100% 0, rgba(3,230,200,0) 14px, rgb(3,230,200) 15px),
+    radial-gradient(circle at 100% 100%, rgba(3,230,200,0) 14px, rgb(3,230,200) 15px),
+    radial-gradient(circle at 0 100%, rgba(3,230,200,0) 14px, rgb(3,230,200) 15px);
+}
+
+.bottompoint {
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+  background:
+    linear-gradient(135deg, transparent 10px, rgb(3,230,200) 0) top left,
+    linear-gradient(225deg, transparent 10px, rgb(3,230,200) 0) top right;
+  background-size: 50% 100%;
+	background-repeat: no-repeat;
+  background-image:
+    radial-gradient(circle at 0 0, rgba(3,230,200,0) 14px, rgb(3,230,200) 15px),
+    radial-gradient(circle at 100% 0, rgba(3,230,200,0) 14px, rgb(3,230,200) 15px);
+  margin-bottom: 50px;
+}
+
+/* Item detail */
+#item-title {
+  font-size: 1.2em;
+}
+
+#item-detail {
+  font-size: 1.2em;
+  font-weight: bold;
+}
+
+#item-pricetitle {
+  top: 22px;
+  font-size: 1.2em;
+}
+
+#item-pointtype {
+  top: 15px;
+  font-size: 2em;
+}
+
+#item-price {
+  font-size: 3.1em;
+  font-weight: bold;
+}
+
+/* Points detail */
+button.btn {
+  font-size: 1.5em;
+  overflow: hidden;
+}
+
+button.btn-point {
+  width: 100%;
+}
+
+button.btn-payable {
+  color: white;
+  background-color: rgb(89,87,87);
+  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+}
+
+button.btn-payable:hover {
+  color: white;
+  background-color: rgb(50,50,50);
+}
+
+button.btn-unpayable:disabled {
+  color: rgb(127,243,228);
+  background-color: rgb(3,230,200);
+  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+}
+
+.points-values {
+  top: 20px;
+  font-size: 1.5em;
+  font-weight: bold;
+}
+
+.points-negative {
+  color: red;
+}
+
+.paypointer {
+  display: none;
+  top: 22px;
+}
+
+#modal-thank {
+  display: none;
 }
