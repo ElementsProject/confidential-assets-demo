@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 type DemoConf struct {
@@ -19,7 +20,7 @@ type DemoConf struct {
 func NewDemoConf(section string) *DemoConf {
 	conf := new(DemoConf)
 	conf.logger = log.New(os.Stdout, "DemoConf:", log.LstdFlags)
-	dir, _ := os.Getwd()
+	dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
 	file, err := os.Open(dir + "/democonf.json")
 	if err != nil {
 		conf.logger.Println("os#Open error", err)
