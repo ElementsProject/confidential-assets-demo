@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -182,7 +183,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/order", orderhandler)
 	mux.HandleFunc("/list", listhandler)
-	dir, _ := os.Getwd()
+	dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
 	fmt.Println("html path:", http.Dir(dir+"/html/dave"))
 	mux.Handle("/", http.FileServer(http.Dir(dir+"/html/dave")))
 	fmt.Println("start listening...", listener.Addr().Network(), listener.Addr())
