@@ -18,13 +18,25 @@ block chain.
 Fred is completely uninteresting but necessary as he makes blocks on the block chain when transactions
 enter his mempool.
 
-## Installing and set up
+## Prerequisites
+
+The demo uses the following libraries/tools:
+
+* [Elements Core](https://github.com/ElementsProject/elements)
+* [Go](https://golang.org/)
+* [jq](https://stedolan.github.io/jq/)
+
+Installation (Go and jq):
+* (linux) using apt as `golang-1.7` and `jq`
+* (macOS) using brew as `golang` and `jq`
+
+## Installation and set up
 
 The demo is written in Go with some HTML/JS components for UI related stuff.
 
 There are five nodes, one for each party mentioned above, as well as several assets that must be
 generated and given to the appropriate party before the demo will function. This can be automated using
-the setup-demo.sh script in the democode folder. This essentially does the following:
+the setup-demo.sh script in the `democode` folder. This essentially does the following:
 
 1. Sets up 5 Elements Core nodes and connects them to each other.
 2. Generates the appropriate assets.
