@@ -193,7 +193,7 @@ func (rpc *Rpc) Request(method string, params ...interface{}) (RpcResponse, erro
 		fmt.Printf("%s\n", bs)
 	}
 	client := &http.Client{}
-	hreq, _ := http.NewRequest(http.MethodPost, rpc.Url, bytes.NewBuffer(bs))
+	hreq, _ := http.NewRequest("POST", rpc.Url, bytes.NewBuffer(bs))
 	hreq.SetBasicAuth(rpc.User, rpc.Pass)
 	hres, err := client.Do(hreq)
 	if err != nil {
