@@ -56,3 +56,19 @@ After this, open two pages in a web browser:
 
 The idea is that Dave presents Alice with his UI, and Alice uses her UI (some app) to perform the
 exchange.
+
+## Screenshots
+
+![SS01](doc/ss01.png)
+
+![SS02](doc/ss02.png)
+
+![SS03](doc/ss03.png)
+
+![SS04](doc/ss04.png)
+
+![SS05](doc/ss05.png)
+
+![SS06](doc/ss06.png)
+
+![SS07](doc/ss07.png)
