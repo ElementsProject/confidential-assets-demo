@@ -47,7 +47,7 @@ type UserSendResponse struct {
 }
 
 type UserWalletInfoRes struct {
-	Balance rpc.Balance `json:"balance"`
+	Balance rpc.BalanceMap `json:"balance"`
 }
 
 type ExchangeOfferRequest struct {
@@ -144,7 +144,7 @@ var handlerList = map[string]func(url.Values, string) ([]byte, error){
 
 var cyclics = []CyclicProcess{CyclicProcess{handler: lockList.Sweep, interval: 3}}
 
-func getMyBalance() (rpc.Balance, error) {
+func getMyBalance() (rpc.BalanceMap, error) {
 	wallet, err := getWalletInfo()
 	if err != nil {
 		logger.Println("error:", err)
@@ -181,7 +181,7 @@ func doWalletInfo(reqParam url.Values, reqBody string) ([]byte, error) {
 
 }
 
-func chooseKnownAssets(b rpc.Balance) {
+func chooseKnownAssets(b rpc.BalanceMap) {
 	for k, _ := range b {
 		if _, ok := assetIdMap[k]; !ok {
 			delete(b, k)
