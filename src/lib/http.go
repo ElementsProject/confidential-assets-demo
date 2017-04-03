@@ -8,6 +8,8 @@
 package lib
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,16 +18,100 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"time"
 )
+
+type ExchangeOfferRequest struct {
+	Request map[string]int64 `json:"request"`
+	Offer   string           `json:"offer"`
+}
+
+type ExchangeOfferWBRequest struct {
+	Request     map[string]int64 `json:"request"`
+	Offer       string           `json:"offer"`
+	Commitments []string         `json:"commitments"`
+}
+
+type ExchangeOfferResponse struct {
+	Fee         int64  `json:"fee"`
+	AssetLabel  string `json:"assetid"`
+	Cost        int64  `json:"cost"`
+	Transaction string `json:"tx"`
+}
+
+func (u *ExchangeOfferResponse) GetID() string {
+	tx := u.Transaction
+	now := time.Now().Unix()
+	nowba := make([]byte, binary.MaxVarintLen64)
+	binary.PutVarint(nowba, now)
+	target := append([]byte(tx), nowba...)
+	hash := sha256.Sum256(target)
+	id := fmt.Sprintf("%x", hash)
+	return id
+}
+
+type ExchangeOfferWBResponse struct {
+	Fee         int64    `json:"fee"`
+	AssetLabel  string   `json:"assetid"`
+	Cost        int64    `json:"cost"`
+	Transaction string   `json:"tx"`
+	Commitments []string `json:"commitments"`
+}
+
+func (u *ExchangeOfferWBResponse) GetID() string {
+	tx := u.Transaction
+	now := time.Now().Unix()
+	nowba := make([]byte, binary.MaxVarintLen64)
+	binary.PutVarint(nowba, now)
+	target := append([]byte(tx), nowba...)
+	hash := sha256.Sum256(target)
+	id := fmt.Sprintf("%x", hash)
+	return id
+}
+
+type ExchangeRateRequest struct {
+	Request map[string]int64 `json:"request"`
+	Offer   string           `json:"offer"`
+}
+
+type ExchangeRateResponse struct {
+	Fee        int64  `json:"fee"`
+	AssetLabel string `json:"assetid"`
+	Cost       int64  `json:"cost"`
+}
+
+func (u *ExchangeRateResponse) GetID() string {
+	tfac := fmt.Sprintf("%d:%s:%d", u.Fee, u.AssetLabel, u.Cost)
+	now := time.Now().Unix()
+	nowba := make([]byte, binary.MaxVarintLen64)
+	binary.PutVarint(nowba, now)
+	target := append([]byte(tfac), nowba...)
+	hash := sha256.Sum256(target)
+	id := fmt.Sprintf("%x", hash)
+	return id
+}
+
+type SubmitExchangeRequest struct {
+	Transaction string `json:"tx"`
+}
+
+type SubmitExchangeResponse struct {
+	TransactionId string `json:"txid"`
+}
 
 type ErrorResponse struct {
 	Result  bool   `json:"result"`
 	Message string `json:"message"`
 }
 
+type CyclicProcess struct {
+	Handler  func()
+	Interval int
+}
+
 var logger *log.Logger
 
-func setLogger(loggerIn *log.Logger) {
+func SetLogger(loggerIn *log.Logger) {
 	logger = loggerIn
 }
 
@@ -62,7 +148,7 @@ func handler(w http.ResponseWriter, r *http.Request, f func(url.Values, string) 
 		defer r.Body.Close()
 		if err != nil {
 			status = http.StatusInternalServerError
-			logger.Println("ioutil#ReadAll error:", err)
+			logger.Println(fmt.Sprintf("ioutil#ReadAll error:%#v", err))
 			_, _ = w.Write(nil)
 			return
 		}
@@ -73,7 +159,7 @@ func handler(w http.ResponseWriter, r *http.Request, f func(url.Values, string) 
 	}
 
 	if err != nil {
-		logger.Println("error:", err)
+		logger.Println(fmt.Sprintf("error:%#v", err))
 		status = http.StatusInternalServerError
 		if res != nil {
 			res = createErrorByteArray(err)
@@ -83,7 +169,7 @@ func handler(w http.ResponseWriter, r *http.Request, f func(url.Values, string) 
 	w.WriteHeader(status)
 	_, err = w.Write(res)
 	if err != nil {
-		logger.Println("w#Write Error:", err)
+		logger.Println(fmt.Sprintf("w#Write Error:%#v", err))
 		return
 	}
 }

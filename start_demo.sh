@@ -121,13 +121,16 @@ fred getwalletinfo
 
 ## preset asset
 echo -n -e "AIRSKY"
-fred sendtoaddress $(alice validateaddress $(alice getnewaddress) | jq -r ".unconfidential") 500 "" "" false "AIRSKY" >/dev/null
+# fred sendtoaddress $(alice validateaddress $(alice getnewaddress) | jq -r ".unconfidential") 500 "" "" false "AIRSKY" >/dev/null
+fred sendtoaddress $(alice getnewaddress) 500 "" "" false "AIRSKY" >/dev/null
 sleep 1
 echo -n -e "\nMELON"
-fred sendtoaddress $(alice validateaddress $(alice getnewaddress) | jq -r ".unconfidential") 100 "" "" false "MELON" >/dev/null
+# fred sendtoaddress $(alice validateaddress $(alice getnewaddress) | jq -r ".unconfidential") 100 "" "" false "MELON" >/dev/null
+fred sendtoaddress $(alice getnewaddress) 100 "" "" false "MELON" >/dev/null
 sleep 1
 echo -n -e "\nMONECRE"
-fred sendtoaddress $(alice validateaddress $(alice getnewaddress) | jq -r ".unconfidential") 150 "" "" false "MONECRE" >/dev/null
+# fred sendtoaddress $(alice validateaddress $(alice getnewaddress) | jq -r ".unconfidential") 150 "" "" false "MONECRE" >/dev/null
+fred sendtoaddress $(alice getnewaddress) 150 "" "" false "MONECRE" >/dev/null
 echo -n -e "\n"
 fred generate 1 >/dev/null
 sleep 1 # wait for sync
@@ -137,7 +140,8 @@ alice getwalletinfo
 echo -n -e "Sending to Charlie [               ]\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
 for i in 100 200 300 400 500; do
   for j in AIRSKY MELON MONECRE; do
-    fred sendtoaddress $(charlie validateaddress $(charlie getnewaddress) | jq -r ".unconfidential") $i "" "" false "$j" >/dev/null
+    # fred sendtoaddress $(charlie validateaddress $(charlie getnewaddress) | jq -r ".unconfidential") $i "" "" false "$j" >/dev/null
+    fred sendtoaddress $(charlie getnewaddress) $i "" "" false "$j" >/dev/null
     echo -n -e "."
   done
 done

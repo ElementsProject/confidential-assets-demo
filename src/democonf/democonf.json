@@ -35,7 +35,7 @@
 		"rpcuser": "user",
 		"rpcpass": "pass",
 		"laddr": ":8030",
-		"confidential": false
+		"confidential": true
 	},
 	"fred": {
 		"rpcurl": "http://127.0.0.1:10040/",

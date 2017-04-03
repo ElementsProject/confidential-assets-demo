@@ -9,6 +9,7 @@ package rpc
 
 import (
 	"fmt"
+	"sort"
 	"time"
 )
 
@@ -87,9 +88,7 @@ func (ll LockList) UnlockUnspentList(ul UnspentList) {
 	}
 }
 
-
-
-func (rpc* Rpc) GetNewAddr(confidential bool) (string, error) {
+func (rpc *Rpc) GetNewAddr(confidential bool) (string, error) {
 	var validAddr ValidatedAddress
 
 	adr, _, err := rpc.RequestAndCastString("getnewaddress")
@@ -117,11 +116,125 @@ func (rpc* Rpc) GetNewAddr(confidential bool) (string, error) {
  * Extract the commitments from a list of UTXOs and return these
  * as an array of hex strings.
  */
-func (rpc* Rpc) GetCommitments(utxos UnspentList) ([]string, error) {
+func (rpc *Rpc) GetCommitments(utxos UnspentList) ([]string, error) {
 	var commitments []string = make([]string, len(utxos))
 
 	for i, u := range utxos {
 		commitments[i] = u.AssetCommitment
 	}
 	return commitments, nil
+}
+
+func (rpc *Rpc) SearchUnspent(lockList LockList, requestAsset string, requestAmount int64, blinding bool) (UnspentList, error) {
+	var totalAmount int64 = 0
+	var ul UnspentList
+	var utxos UnspentList = make(UnspentList, 0)
+
+	_, err := rpc.RequestAndUnmarshalResult(&ul, "listunspent", 1, 9999999, []string{}, requestAsset)
+	if err != nil {
+		return utxos, err
+	}
+	sort.Sort(sort.Reverse(ul))
+
+	for _, u := range ul {
+		if requestAmount < totalAmount {
+			break
+		}
+		/*
+			if blinding && (u.AssetCommitment == "") {
+				continue
+			}
+			if !blinding && (u.AssetCommitment != "") {
+				continue
+			}
+		*/
+		if !(u.Spendable || u.Solvable) {
+			continue
+		}
+		if !lockList.Lock(u.Txid, u.Vout) {
+			continue
+		}
+		totalAmount += u.Amount
+		utxos = append(utxos, u)
+	}
+
+	if requestAmount >= totalAmount {
+		lockList.UnlockUnspentList(utxos)
+		err = fmt.Errorf("no sufficient utxo")
+		return utxos, err
+	}
+
+	return utxos, nil
+}
+
+func (rpc *Rpc) SearchMinimalUnspent(lockList LockList, requestAsset string, blinding bool) (UnspentList, error) {
+	var ul UnspentList
+	var utxos UnspentList
+
+	_, err := rpc.RequestAndUnmarshalResult(&ul, "listunspent", 1, 9999999, []string{}, requestAsset)
+	if err != nil {
+		return utxos, err
+	}
+
+	if ul.Len() == 0 {
+		err := fmt.Errorf("no utxo [%s]", requestAsset)
+		return utxos, err
+	}
+
+	sort.Sort(ul)
+	var start int = 0
+	var found bool = false
+	for i, u := range ul {
+		/*
+			if blinding && (u.AssetCommitment == "") {
+				continue
+			}
+			if !blinding && (u.AssetCommitment != "") {
+				continue
+			}
+		*/
+		if !(u.Spendable || u.Solvable) {
+			continue
+		}
+		if !lockList.Lock(u.Txid, u.Vout) {
+			continue
+		}
+
+		start = i
+		found = true
+	}
+	if !found {
+		err := fmt.Errorf("no utxo [%s]", requestAsset)
+		return utxos, err
+	}
+
+	minUnspent := ul[start]
+	if ul.Len() == start+1 {
+		utxos = append(utxos, minUnspent)
+		return utxos, nil
+	}
+
+	for _, u := range ul[start+1:] {
+		if u.Amount != minUnspent.Amount {
+			break
+		}
+		if blinding && (u.AssetCommitment == "") {
+			continue
+		}
+		if !blinding && (u.AssetCommitment != "") {
+			continue
+		}
+		if !(u.Spendable || u.Solvable) {
+			continue
+		}
+		if !lockList.Lock(u.Txid, u.Vout) {
+			continue
+		}
+
+		lockList.Unlock(minUnspent.Txid, minUnspent.Vout)
+		minUnspent = u
+	}
+
+	utxos = append(utxos, minUnspent)
+	return utxos, nil
 }
