@@ -71,11 +71,11 @@ echo "- generating initial blocks to reach maturity"
 fred generate 100 >/dev/null
 
 echo -n -e "- generating AIRSKY asset"
-AIRSKY=$(fred generateasset 1000000)
+AIRSKY=$(fred issueasset 1000000 500 | jq -r ".asset")
 echo -n -e ": $AIRSKY\n- generating MELON asset"
-MELON=$(fred generateasset 2000000)
+MELON=$(fred issueasset 2000000 500 | jq -r ".asset")
 echo -n -e ": $MELON\n- generating MONECRE asset"
-MONECRE=$(fred generateasset 2000000)
+MONECRE=$(fred issueasset 2000000 500 | jq -r ".asset")
 echo ": $MONECRE"
 
 echo -n -e "final setup - starting daemons"
