@@ -38,7 +38,11 @@ The demo must be built. This can be done using the `build.sh` script.
 
 There are five nodes, one for each party mentioned above, as well as several assets that must be
 generated and given to the appropriate party before the demo will function. This can be automated using
-the `start_demo.sh` script. This essentially does the following:
+the `start_demo.sh` script. For this to work, you must have `elementsd`, `elements-tx`, and `elements-cli`
+in the path. E.g. by doing `export PATH=$PATH:/home/me/workspace/elements/src` or alternatively by doing
+`make install` from `elements/src` beforehand.
+
+`start_demo.sh` essentially does the following:
 
 1. Sets up 5 Elements Core nodes and connects them to each other.
 2. Generates the appropriate assets.
