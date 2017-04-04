@@ -10,7 +10,6 @@ import (
 	"democonf"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"lib"
@@ -75,20 +74,18 @@ const (
 	defaultRpcURL        = "http://127.0.0.1:10000"
 	defaultRpcUser       = "user"
 	defaultPpcPass       = "pass"
-	defaultListen        = ":8000"
+	defaultLocalAddr     = ":8000"
 	defaultTxPath        = "elements-tx"
 	defaultTxOption      = ""
 	defaultTimeout       = 600
 	exchangerName        = "charlie"
-	defaultCharlieListen = ":8020"
+	defaultExchLocalAddr = ":8020"
 )
 
 var logger *log.Logger = log.New(os.Stdout, myActorName+":", log.LstdFlags+log.Lshortfile)
 var conf = democonf.NewDemoConf(myActorName)
-var stop bool = false
 var assetIdMap = make(map[string]string)
 var lockList = make(rpc.LockList)
-var utxoLockDuration time.Duration
 var rpcClient *rpc.Rpc
 var elementsTxCommand string
 var elementsTxOption string
@@ -99,7 +96,6 @@ var exchangeRateURL string
 var exchangeOfferWBURL string
 var exchangeOfferURL string
 var exchangeSubmitURL string
-var confidential = false
 
 var handlerList = map[string]func(url.Values, string) ([]byte, error){
 	"/walletinfo": doWalletInfo,
@@ -124,7 +120,6 @@ func getMyBalance() (rpc.BalanceMap, error) {
 }
 
 func doWalletInfo(reqParam url.Values, reqBody string) ([]byte, error) {
-	logger.Println(fmt.Sprintf("doWalletInfo start. %#v", reqParam))
 	balance, err := getMyBalance()
 	if err != nil {
 		logger.Println("error:", err)
@@ -156,20 +151,18 @@ func chooseKnownAssets(b rpc.BalanceMap) {
 }
 
 func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
-	logger.Println(fmt.Sprintf("doOffer start. %#v", reqParam))
 	userOfferResponse := make(UserOfferResponse)
 	var quotation Quotation
 
 	tmp, ok := reqParam["asset"]
-	fmt.Printf("%#v¥n\n", reqParam)
 	if !ok {
-		err := errors.New("no offer asset label found:")
+		err := fmt.Errorf("no offer asset label found:")
 		logger.Println("error:", err)
 		return nil, err
 	}
 
 	if len(tmp) != 1 {
-		err := errors.New("offer must single record:" + fmt.Sprintf("%d", len(tmp)))
+		err := fmt.Errorf("offer must single record but has:%d", len(tmp))
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -177,12 +170,12 @@ func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
 
 	tmp, ok = reqParam["cost"]
 	if !ok {
-		err := errors.New("no offer asset amount found:")
+		err := fmt.Errorf("no offer asset amount found:")
 		logger.Println("error:", err)
 		return nil, err
 	}
 	if len(tmp) != 1 {
-		err := errors.New("cost must be a single record:" + fmt.Sprintf("%d", len(tmp)))
+		err := fmt.Errorf("cost must be a single record but has:%d", len(tmp))
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -236,7 +229,7 @@ func appendTransactionInfo(sendToAddr string, sendAsset string, sendAmount int64
 	template := offerDetail.Transaction
 	cost := offerDetail.Cost
 	fee := offerDetail.Fee
-	change := getAmount(utxos) - (cost + fee)
+	change := utxos.GetAmount() - (cost + fee)
 	params := []string{}
 
 	if elementsTxOption != "" {
@@ -245,7 +238,6 @@ func appendTransactionInfo(sendToAddr string, sendAsset string, sendAmount int64
 	params = append(params, template)
 
 	for _, u := range utxos {
-		//		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10) + ":" + strconv.FormatInt(u.Amount, 10)
 		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10)
 		params = append(params, txin)
 	}
@@ -265,7 +257,7 @@ func appendTransactionInfo(sendToAddr string, sendAsset string, sendAmount int64
 	out, err := exec.Command(elementsTxCommand, params...).Output()
 
 	if err != nil {
-		logger.Println("elements-tx error:", err, fmt.Sprintf("\n\tparams: %#v\n\toutput: %#v", params, out))
+		logger.Println("elements-tx error:", err, params, out)
 		return "", err
 	}
 
@@ -277,9 +269,9 @@ func appendTransactionInfoWB(sendToAddr string, sendAsset string, sendAmount int
 	template := offerDetail.Transaction
 	cost := offerDetail.Cost
 	fee := offerDetail.Fee
-	change := getAmount(utxos) - (cost + fee)
+	change := utxos.GetAmount() - (cost + fee)
 	params := []string{}
-	lbChange := getAmount(loopbackUtxos)
+	lbChange := loopbackUtxos.GetAmount()
 
 	if elementsTxOption != "" {
 		params = append(params, elementsTxOption)
@@ -287,12 +279,10 @@ func appendTransactionInfoWB(sendToAddr string, sendAsset string, sendAmount int
 	params = append(params, template)
 
 	for _, u := range utxos {
-		//		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10) + ":" + strconv.FormatInt(u.Amount, 10)
 		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10)
 		params = append(params, txin)
 	}
 	for _, u := range loopbackUtxos {
-		//		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10) + ":" + strconv.FormatInt(u.Amount, 10)
 		txin := "in=" + u.Txid + ":" + strconv.FormatInt(u.Vout, 10)
 		params = append(params, txin)
 	}
@@ -316,16 +306,10 @@ func appendTransactionInfoWB(sendToAddr string, sendAsset string, sendAmount int
 	outAddrSend := "outaddr=" + strconv.FormatInt(sendAmount, 10) + ":" + sendToAddr + ":" + assetIdMap[sendAsset]
 	params = append(params, outAddrSend)
 
-	logger.Println("=== tx-command param start ===")
-	for _, p := range params {
-		logger.Println(p)
-	}
-	logger.Println("=== tx-command param end ===")
-
 	out, err := exec.Command(elementsTxCommand, params...).Output()
 
 	if err != nil {
-		logger.Println("elements-tx error:", err, fmt.Sprintf("\n\tparams: %#v\n\toutput: %#v", params, out))
+		logger.Println("elements-tx error:", err, params, out)
 		return "", err
 	}
 
@@ -336,13 +320,13 @@ func appendTransactionInfoWB(sendToAddr string, sendAsset string, sendAmount int
 func doSend(reqParam url.Values, reqBody string) ([]byte, error) {
 	tmp, ok := reqParam["id"]
 	if !ok {
-		err := errors.New("no id found:")
+		err := fmt.Errorf("no id found:")
 		logger.Println("error:", err)
 		return nil, err
 	}
 
 	if len(tmp) != 1 {
-		err := errors.New("id must be a single record:" + fmt.Sprintf("%d", len(tmp)))
+		err := fmt.Errorf("id must be a single record but has:%d", len(tmp))
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -350,13 +334,13 @@ func doSend(reqParam url.Values, reqBody string) ([]byte, error) {
 
 	tmp, ok = reqParam["addr"]
 	if !ok {
-		err := errors.New("no addr found:")
+		err := fmt.Errorf("no addr found:")
 		logger.Println("error:", err)
 		return nil, err
 	}
 
 	if len(tmp) != 1 {
-		err := errors.New("addr must be a single record:" + fmt.Sprintf("%d", len(tmp)))
+		err := fmt.Errorf("addr must be a single record but has:%d", len(tmp))
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -382,8 +366,6 @@ func doSend(reqParam url.Values, reqBody string) ([]byte, error) {
 }
 
 func doSendWithBlinding(offerID string, sendToAddr string) (UserSendResponse, error) {
-	logger.Println(fmt.Sprintf("doSendWithBlinding start. (%s, %s)", offerID, sendToAddr))
-
 	var userSendResponse UserSendResponse
 
 	quotationID, offerAsset, err := getQuotation(quotationList, offerID)
@@ -439,14 +421,14 @@ func doSendWithBlinding(offerID string, sendToAddr string) (UserSendResponse, er
 
 	blindtx, _, err := rpcClient.RequestAndCastString("blindrawtransaction", tx, commitments)
 	if err != nil {
-		logger.Println("RPC/blindrawtransaction error:", err, fmt.Sprintf("\n\tparam :%#v", tx))
+		logger.Println("RPC/blindrawtransaction error:", err, tx)
 		return userSendResponse, err
 	}
 
 	var signedtx rpc.SignedTransaction
 	_, err = rpcClient.RequestAndUnmarshalResult(&signedtx, "signrawtransaction", blindtx)
 	if err != nil {
-		logger.Println("RPC/signrawtransaction error:", err, fmt.Sprintf("\n\tparam :%#v", blindtx))
+		logger.Println("RPC/signrawtransaction error:", err, blindtx)
 		return userSendResponse, err
 	}
 
@@ -467,8 +449,6 @@ func doSendWithBlinding(offerID string, sendToAddr string) (UserSendResponse, er
 }
 
 func doSendWithNoBlinding(offerID string, sendToAddr string) (UserSendResponse, error) {
-	logger.Println(fmt.Sprintf("doSendWithNoBlinding start. (%s, %s)", offerID, sendToAddr))
-
 	var userSendResponse UserSendResponse
 
 	quotationID, offerAsset, err := getQuotation(quotationList, offerID)
@@ -512,7 +492,7 @@ func doSendWithNoBlinding(offerID string, sendToAddr string) (UserSendResponse, 
 	var signedtx rpc.SignedTransaction
 	_, err = rpcClient.RequestAndUnmarshalResult(&signedtx, "signrawtransaction", tx)
 	if err != nil {
-		logger.Println("RPC/signrawtransaction error:", err, fmt.Sprintf("\n\tparam :%#v", tx))
+		logger.Println("RPC/signrawtransaction error:", err, tx)
 		return userSendResponse, err
 	}
 
@@ -556,20 +536,6 @@ func getQuotation(ql map[string]Quotation, offerID string) (string, string, erro
 	return quotationID, offerAsset, nil
 }
 
-func getLockingKey(txid string, vout int64) string {
-	return fmt.Sprintf("%s:%d", txid, vout)
-}
-
-func getAmount(ul rpc.UnspentList) int64 {
-	var totalAmount int64 = 0
-
-	for _, u := range ul {
-		totalAmount += u.Amount
-	}
-
-	return totalAmount
-}
-
 func getWalletInfo() (rpc.Wallet, error) {
 	var walletInfo rpc.Wallet
 
@@ -611,8 +577,7 @@ func getexchangerate(requestAsset string, requestAmount int64, offerAsset string
 	_, err := callExchangerAPI(exchangeRateURL, rateReq, &rateRes)
 
 	if err != nil {
-		logger.Println("json#Marshal error:", err)
-		logger.Println("----:%#v", rateRes)
+		logger.Println("json#Marshal error:", err, rateRes)
 	}
 	return rateRes, err
 }
@@ -708,39 +673,16 @@ func initialize() {
 	}
 	delete(assetIdMap, "bitcoin")
 
-	localAddr = conf.GetString("laddr", defaultListen)
+	localAddr = conf.GetString("laddr", defaultLocalAddr)
 	elementsTxCommand = conf.GetString("txpath", defaultTxPath)
 	elementsTxOption = conf.GetString("txoption", defaultTxOption)
-	utxoLockDuration = time.Duration(int64(conf.GetNumber("timeout", defaultTimeout))) * time.Second
+	rpc.SetUtxoLockDuration(time.Duration(int64(conf.GetNumber("timeout", defaultTimeout))) * time.Second)
 
-	exchangeRateURL = "http://127.0.0.1" + exchangerConf.GetString("laddr", defaultCharlieListen) + "/getexchangerate/"
-	exchangeOfferWBURL = "http://127.0.0.1" + exchangerConf.GetString("laddr", defaultCharlieListen) + "/getexchangeofferwb/"
-	exchangeOfferURL = "http://127.0.0.1" + exchangerConf.GetString("laddr", defaultCharlieListen) + "/getexchangeoffer/"
-	exchangeSubmitURL = "http://127.0.0.1" + exchangerConf.GetString("laddr", defaultCharlieListen) + "/submitexchange/"
-}
-
-func cyclicProcStart(cps []lib.CyclicProcess) {
-	for _, cyclic := range cps {
-		go func() {
-			fmt.Println("Loop interval:", cyclic.Interval)
-			for {
-				time.Sleep(time.Duration(cyclic.Interval) * time.Second)
-				if stop {
-					break
-				}
-				cyclic.Handler()
-			}
-		}()
-	}
-}
-
-func waitStopSignal() {
-	for {
-		time.Sleep(1 * time.Second)
-		if stop {
-			break
-		}
-	}
+	exLocalAddr := exchangerConf.GetString("laddr", defaultExchLocalAddr)
+	exchangeRateURL = "http://127.0.0.1" + exLocalAddr + "/getexchangerate/"
+	exchangeOfferWBURL = "http://127.0.0.1" + exLocalAddr + "/getexchangeofferwb/"
+	exchangeOfferURL = "http://127.0.0.1" + exLocalAddr + "/getexchangeoffer/"
+	exchangeSubmitURL = "http://127.0.0.1" + exLocalAddr + "/submitexchange/"
 }
 
 func main() {
@@ -756,15 +698,16 @@ func main() {
 
 	// signal handling (ctrl + c)
 	sig := make(chan os.Signal)
+	stop := false
 	signal.Notify(sig, syscall.SIGINT)
 	go func() {
 		logger.Println(<-sig)
 		stop = true
 	}()
 
-	cyclicProcStart(cyclics)
+	lib.StartCyclicProc(cyclics, &stop)
 
-	waitStopSignal()
+	lib.WaitStopSignal(&stop)
 
 	logger.Println(myActorName + " stop")
 }
