@@ -41,6 +41,16 @@ func (ul UnspentList) Less(i, j int) bool {
 	return (*ul[i]).Confirmations < (*ul[j]).Confirmations
 }
 
+func (ul UnspentList) GetAmount() int64 {
+	var totalAmount int64 = 0
+
+	for _, u := range ul {
+		totalAmount += u.Amount
+	}
+
+	return totalAmount
+}
+
 func getLockingKey(txid string, vout int64) string {
 	return fmt.Sprintf("%s:%d", txid, vout)
 }
@@ -140,14 +150,12 @@ func (rpc *Rpc) SearchUnspent(lockList LockList, requestAsset string, requestAmo
 		if requestAmount < totalAmount {
 			break
 		}
-		/*
-			if blinding && (u.AssetCommitment == "") {
-				continue
-			}
-			if !blinding && (u.AssetCommitment != "") {
-				continue
-			}
-		*/
+		if blinding && (u.AssetCommitment == "") {
+			continue
+		}
+		if !blinding && (u.AssetCommitment != "") {
+			continue
+		}
 		if !(u.Spendable || u.Solvable) {
 			continue
 		}
@@ -185,14 +193,12 @@ func (rpc *Rpc) SearchMinimalUnspent(lockList LockList, requestAsset string, bli
 	var start int = 0
 	var found bool = false
 	for i, u := range ul {
-		/*
-			if blinding && (u.AssetCommitment == "") {
-				continue
-			}
-			if !blinding && (u.AssetCommitment != "") {
-				continue
-			}
-		*/
+		if blinding && (u.AssetCommitment == "") {
+			continue
+		}
+		if !blinding && (u.AssetCommitment != "") {
+			continue
+		}
 		if !(u.Spendable || u.Solvable) {
 			continue
 		}
