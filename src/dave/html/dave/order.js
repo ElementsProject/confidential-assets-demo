@@ -36,7 +36,7 @@ function order() {
 }
 
 function reset() {
-    if (confirm("注文ページにもどりますか？")) {
+    if (confirm("Return to order page?")) {
         $("#after").fadeOut('slow', function () { $("#before").fadeIn('slow'); });
     }
 }
@@ -44,6 +44,7 @@ function reset() {
 function copyUri() {
     document.getElementById("uri").select();
     document.execCommand("copy");
+    alert("Data in clipboard; paste this into the customer interface");
 }
 
 $(init);
