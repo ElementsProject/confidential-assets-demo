@@ -44,7 +44,7 @@ function reset() {
 function copyUri() {
     document.getElementById("uri").select();
     document.execCommand("copy");
-    alert("Data in clipboard; paste this into the customer interface");
+    $("#message").fadeIn('slow').delay(1000).fadeOut('slow');
 }
 
 $(init);
