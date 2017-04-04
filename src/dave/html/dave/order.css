@@ -222,3 +222,18 @@ body {
     height: 1px;
     border: none;
 }
+
+#message {
+    position: fixed;
+    top: 300px;
+    left: 50%;
+    width: 500px;
+    margin-left: -250px;
+    height: 2em;
+    line-height: 2em;
+    border-radius: 5px;
+    background-color: gray;
+    color: white;
+    font-weight: bold;
+    display: none;
+}
