@@ -162,7 +162,7 @@ func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
 	}
 
 	if len(tmp) != 1 {
-		err := fmt.Errorf("offer must single record but has:%d", len(tmp))
+		err := fmt.Errorf("offer must be a single record but has:%d", len(tmp))
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -678,11 +678,11 @@ func initialize() {
 	elementsTxOption = conf.GetString("txoption", defaultTxOption)
 	rpc.SetUtxoLockDuration(time.Duration(int64(conf.GetNumber("timeout", defaultTimeout))) * time.Second)
 
-	exLocalAddr := exchangerConf.GetString("laddr", defaultExchLocalAddr)
-	exchangeRateURL = "http://127.0.0.1" + exLocalAddr + "/getexchangerate/"
-	exchangeOfferWBURL = "http://127.0.0.1" + exLocalAddr + "/getexchangeofferwb/"
-	exchangeOfferURL = "http://127.0.0.1" + exLocalAddr + "/getexchangeoffer/"
-	exchangeSubmitURL = "http://127.0.0.1" + exLocalAddr + "/submitexchange/"
+	exLocalAddr := "http://127.0.0.1" + exchangerConf.GetString("laddr", defaultExchLocalAddr)
+	exchangeRateURL = exLocalAddr + "/getexchangerate/"
+	exchangeOfferWBURL = exLocalAddr + "/getexchangeofferwb/"
+	exchangeOfferURL = exLocalAddr + "/getexchangeoffer/"
+	exchangeSubmitURL = exLocalAddr + "/submitexchange/"
 }
 
 func main() {

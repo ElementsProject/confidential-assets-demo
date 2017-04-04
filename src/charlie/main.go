@@ -74,7 +74,7 @@ func doGetRate(reqParam url.Values, reqBody string) ([]byte, error) {
 	}
 	request := rateRequest.Request
 	if len(request) != 1 {
-		err = fmt.Errorf("request must single record, but has :%d", len(request))
+		err = fmt.Errorf("request must be a single record but has:%d", len(request))
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func doOfferWithBlinding(reqParam url.Values, reqBody string) ([]byte, error) {
 	}
 	request := offerRequest.Request
 	if len(request) != 1 {
-		err = fmt.Errorf("request must single record but has :%d", len(request))
+		err = fmt.Errorf("request must be a single record but has:%d", len(request))
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
 	}
 	request := offerRequest.Request
 	if len(request) != 1 {
-		err = fmt.Errorf("request must single record but has :%d", len(request))
+		err = fmt.Errorf("request must be a single record but has:%d", len(request))
 		logger.Println("error:", err)
 		return nil, err
 	}
