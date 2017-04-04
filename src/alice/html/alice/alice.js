@@ -1,5 +1,5 @@
 
-var url = "http://localhost:8000/";
+var url = "/";
 
 var wallets = {};
 
@@ -119,7 +119,7 @@ function getPayInfo() {
         for (let a of as) {
             let kv = a.split("=");
             if (kv.length == 2) {
-                payinfo[kv[0]] = kv[1];
+                payinfo[kv[0]] = decodeURIComponent(kv[1].replace(/\+/ig,"%20"));
             }
         }
         if (payinfo["name"] && payinfo["addr"] && payinfo["price"] && payinfo["asset"]) {
