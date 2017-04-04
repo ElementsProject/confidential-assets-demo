@@ -11,63 +11,16 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
+	"reflect"
+	"runtime"
 	"time"
 )
-
-type ExchangeOfferRequest struct {
-	Request map[string]int64 `json:"request"`
-	Offer   string           `json:"offer"`
-}
-
-type ExchangeOfferWBRequest struct {
-	Request     map[string]int64 `json:"request"`
-	Offer       string           `json:"offer"`
-	Commitments []string         `json:"commitments"`
-}
-
-type ExchangeOfferResponse struct {
-	Fee         int64  `json:"fee"`
-	AssetLabel  string `json:"assetid"`
-	Cost        int64  `json:"cost"`
-	Transaction string `json:"tx"`
-}
-
-func (u *ExchangeOfferResponse) GetID() string {
-	tx := u.Transaction
-	now := time.Now().Unix()
-	nowba := make([]byte, binary.MaxVarintLen64)
-	binary.PutVarint(nowba, now)
-	target := append([]byte(tx), nowba...)
-	hash := sha256.Sum256(target)
-	id := fmt.Sprintf("%x", hash)
-	return id
-}
-
-type ExchangeOfferWBResponse struct {
-	Fee         int64    `json:"fee"`
-	AssetLabel  string   `json:"assetid"`
-	Cost        int64    `json:"cost"`
-	Transaction string   `json:"tx"`
-	Commitments []string `json:"commitments"`
-}
-
-func (u *ExchangeOfferWBResponse) GetID() string {
-	tx := u.Transaction
-	now := time.Now().Unix()
-	nowba := make([]byte, binary.MaxVarintLen64)
-	binary.PutVarint(nowba, now)
-	target := append([]byte(tx), nowba...)
-	hash := sha256.Sum256(target)
-	id := fmt.Sprintf("%x", hash)
-	return id
-}
 
 type ExchangeRateRequest struct {
 	Request map[string]int64 `json:"request"`
@@ -81,14 +34,51 @@ type ExchangeRateResponse struct {
 }
 
 func (u *ExchangeRateResponse) GetID() string {
-	tfac := fmt.Sprintf("%d:%s:%d", u.Fee, u.AssetLabel, u.Cost)
+	return generateID(fmt.Sprintf("%d:%s:%d", u.Fee, u.AssetLabel, u.Cost))
+}
+
+func generateID(key string) string {
 	now := time.Now().Unix()
 	nowba := make([]byte, binary.MaxVarintLen64)
 	binary.PutVarint(nowba, now)
-	target := append([]byte(tfac), nowba...)
+	target := append([]byte(key), nowba...)
 	hash := sha256.Sum256(target)
 	id := fmt.Sprintf("%x", hash)
 	return id
+}
+
+type ExchangeOfferRequest struct {
+	Request map[string]int64 `json:"request"`
+	Offer   string           `json:"offer"`
+}
+
+type ExchangeOfferResponse struct {
+	Fee         int64  `json:"fee"`
+	AssetLabel  string `json:"assetid"`
+	Cost        int64  `json:"cost"`
+	Transaction string `json:"tx"`
+}
+
+func (u *ExchangeOfferResponse) GetID() string {
+	return generateID(u.Transaction)
+}
+
+type ExchangeOfferWBRequest struct {
+	Request     map[string]int64 `json:"request"`
+	Offer       string           `json:"offer"`
+	Commitments []string         `json:"commitments"`
+}
+
+type ExchangeOfferWBResponse struct {
+	Fee         int64    `json:"fee"`
+	AssetLabel  string   `json:"assetid"`
+	Cost        int64    `json:"cost"`
+	Transaction string   `json:"tx"`
+	Commitments []string `json:"commitments"`
+}
+
+func (u *ExchangeOfferWBResponse) GetID() string {
+	return generateID(u.Transaction)
 }
 
 type SubmitExchangeRequest struct {
@@ -117,7 +107,7 @@ func SetLogger(loggerIn *log.Logger) {
 
 func createErrorByteArray(e error) []byte {
 	if e == nil {
-		e = errors.New("error occured (fake)")
+		e = fmt.Errorf("error occured (fake)")
 	}
 	res := ErrorResponse{
 		Result:  false,
@@ -127,7 +117,7 @@ func createErrorByteArray(e error) []byte {
 	return b
 }
 
-func handler(w http.ResponseWriter, r *http.Request, f func(url.Values, string) ([]byte, error)) {
+func handler(w http.ResponseWriter, r *http.Request, f func(url.Values, string) ([]byte, error), n string) {
 	w.Header().Add("Access-Control-Allow-Origin", "*")
 	w.Header().Add("Access-Control-Allow-Methods", "GET")
 	w.Header().Add("Access-Control-Allow-Headers", r.Header.Get("Access-Control-Request-Headers"))
@@ -141,25 +131,28 @@ func handler(w http.ResponseWriter, r *http.Request, f func(url.Values, string) 
 	switch r.Method {
 	case "GET":
 		r.ParseForm()
+		logger.Println("start:", n)
 		res, err = f(r.Form, "")
+		logger.Println("end:", n)
 
 	case "POST":
 		req, err := ioutil.ReadAll(r.Body)
-		defer r.Body.Close()
 		if err != nil {
 			status = http.StatusInternalServerError
-			logger.Println(fmt.Sprintf("ioutil#ReadAll error:%#v", err))
+			logger.Println("ioutil#ReadAll error:", err)
 			_, _ = w.Write(nil)
 			return
 		}
+		logger.Println("start:", n)
 		res, err = f(nil, string(req))
+		logger.Println("end:", n)
 
 	default:
 		status = http.StatusMethodNotAllowed
 	}
 
 	if err != nil {
-		logger.Println(fmt.Sprintf("error:%#v", err))
+		logger.Println("error:", err)
 		status = http.StatusInternalServerError
 		if res != nil {
 			res = createErrorByteArray(err)
@@ -169,14 +162,16 @@ func handler(w http.ResponseWriter, r *http.Request, f func(url.Values, string) 
 	w.WriteHeader(status)
 	_, err = w.Write(res)
 	if err != nil {
-		logger.Println(fmt.Sprintf("w#Write Error:%#v", err))
+		logger.Println("w#Write Error:", err)
 		return
 	}
 }
 
 func generateMuxHandler(h func(url.Values, string) ([]byte, error)) func(http.ResponseWriter, *http.Request) {
+	fv := reflect.ValueOf(h)
+	n := runtime.FuncForPC(fv.Pointer()).Name()
 	return func(w http.ResponseWriter, r *http.Request) {
-		handler(w, r, h)
+		handler(w, r, h, n)
 		return
 	}
 }
@@ -197,4 +192,28 @@ func StartHttpServer(laddr string, handlers map[string]func(url.Values, string) 
 	go http.Serve(listener, mux)
 
 	return listener, err
+}
+
+func StartCyclicProc(cps []CyclicProcess, stop *bool) {
+	for _, cyclic := range cps {
+		go func() {
+			logger.Println("Loop interval:", cyclic.Interval)
+			for {
+				time.Sleep(time.Duration(cyclic.Interval) * time.Second)
+				if *stop {
+					break
+				}
+				cyclic.Handler()
+			}
+		}()
+	}
+}
+
+func WaitStopSignal(stop *bool) {
+	for {
+		time.Sleep(1 * time.Second)
+		if *stop {
+			break
+		}
+	}
 }
