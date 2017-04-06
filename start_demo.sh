@@ -16,18 +16,12 @@ DEMOD=$PWD/demo
 ELDAE=elementsd
 ELCLI=elements-cli
 ELTX=elements-tx
-echo "ELCLI=$ELCLI" >> ./demo.tmp
 
 ## cleanup previous data
-#for i in alice bob charlie dave fred; do
-#    ${ELCLI} -datadir=${DEMOD}/data/${i} stop 2>/dev/null
-#    pkill -SIGINT $i
-#done
-#pkill ${ELDAE}
-#sleep 2
 if [ -e ./demo.tmp ]; then
     ./stop_demo.sh
 fi
+echo "ELCLI=$ELCLI" >> ./demo.tmp
 
 ## cleanup previous data
 rm -rf ${DEMOD}/data
@@ -95,8 +89,8 @@ assetdir=$AIRSKY:AIRSKY
 assetdir=$MELON:MELON
 assetdir=$MONECRE:MONECRE
 EOF
-    ${ELDAE} -datadir=${DEMOD}/data/$i
-    echo "${i}_dae=`ps xw | grep -- -datadir=${DEMOD}/data/$i  | grep -v grep | awk '{print $1}'`" >> ./demo.tmp
+    ${ELDAE} -datadir=${DEMOD}/data/$i &
+    echo "${i}_dae=$!" >> ./demo.tmp
 done
 
 LDW=1
