@@ -18,12 +18,10 @@ ELCLI=elements-cli
 ELTX=elements-tx
 
 ## cleanup previous data
-for i in alice bob charlie dave fred; do
-    ${ELCLI} -datadir=${DEMOD}/data/${i} stop 2>/dev/null
-    pkill -SIGINT $i
-done
-pkill ${ELDAE}
-sleep 2
+if [ -e ./demo.tmp ]; then
+    ./stop_demo.sh
+fi
+echo "ELCLI=$ELCLI" >> ./demo.tmp
 
 ## cleanup previous data
 rm -rf ${DEMOD}/data
@@ -51,6 +49,7 @@ EOF
     alias ${i}-dae="${ELDAE} -datadir=${DEMOD}/data/$i"
     alias ${i}-tx="${ELTX}"
     alias ${i}="${ELCLI} -datadir=${DEMOD}/data/$i"
+    echo "${i}_dir=\"-datadir=${DEMOD}/data/$i\"" >> ./demo.tmp
 done
 
 fred-dae
@@ -90,7 +89,8 @@ assetdir=$AIRSKY:AIRSKY
 assetdir=$MELON:MELON
 assetdir=$MONECRE:MONECRE
 EOF
-    ${ELDAE} -datadir=${DEMOD}/data/$i
+    ${ELDAE} -datadir=${DEMOD}/data/$i &
+    echo "${i}_dae=$!" >> ./demo.tmp
 done
 
 LDW=1
@@ -154,6 +154,7 @@ charlie getwalletinfo
 cd ${DEMOD}
 for i in alice bob charlie dave fred; do
     ./$i &
+    echo "${i}_pid=$!" >> ../demo.tmp
 done
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
