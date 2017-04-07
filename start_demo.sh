@@ -40,7 +40,7 @@ port=$((10001 + $PORT))
 
 connect=localhost:$((10001 + $(($PORT + 10)) % 50))
 regtest=1
-daemon=1
+daemon=0
 listen=1
 txindex=1
 keypool=10
@@ -52,7 +52,7 @@ EOF
     echo "${i}_dir=\"-datadir=${DEMOD}/data/$i\"" >> ./demo.tmp
 done
 
-fred-dae
+fred-dae &
 
 LDW=1
 while [ "${LDW}" = "1" ]
