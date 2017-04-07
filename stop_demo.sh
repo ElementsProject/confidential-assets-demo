@@ -7,14 +7,14 @@ if [ -e ./demo.tmp ]; then
 
     gopids=( $dave_pid $alice_pid $charlie_pid $fred_pid $bob_pid )
     for pid in "${gopids[@]}"; do
-        if [ -e "/proc/$pid" ]; then
+        if ps -p $pid > /dev/null ; then
             echo "kill -SIGINT $pid"
             kill -SIGINT $pid
         fi
     done
     sleep 3
     for pid in "${gopids[@]}"; do
-        if [ -e "/proc/$pid" ]; then
+        if ps -p $pid > /dev/null ; then
             echo "kill -9 $pid"
             kill -9 $pid
         fi
@@ -28,7 +28,7 @@ if [ -e ./demo.tmp ]; then
     sleep 3
     pids=( $dave_dae $alice_dae $charlie_dae $fred_dae $bob_dae )
     for pid in "${pids[@]}"; do
-        if [ -e "/proc/$pid" ]; then
+        if ps -p $pid > /dev/null ; then
             echo "kill -9 $pid"
             kill -9 $pid
         fi
