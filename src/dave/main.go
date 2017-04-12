@@ -23,16 +23,16 @@ import (
 )
 
 // URL for accessing RPC
-var rpcurl string = "http://127.0.0.1:10030"
+var rpcurl = "http://127.0.0.1:10030"
 
 // ID for accessing RPC
-var rpcuser string = "user"
+var rpcuser = "user"
 
 // Password for accessing RPC
-var rpcpass string = "pass"
+var rpcpass = "pass"
 
 // Listen addr for RPC Proxy
-var laddr string = ":8030"
+var laddr = ":8030"
 
 //  getNewAddress use confidential
 var confidential = false
@@ -41,16 +41,18 @@ var rpcClient *rpc.Rpc
 
 var interval = 3 * time.Second
 
+// Item details
 type Item struct {
 	Price   float64
 	Asset   string
 	Timeout int64
 }
 
-var items map[string]Item = map[string]Item{
+var items = map[string]Item{
 	"Caramel Macchiato Coffee": Item{Price: float64(200), Asset: "MELON", Timeout: int64(60 * 60)},
 }
 
+// Order details
 type Order struct {
 	Item       string
 	Addr       string
@@ -61,11 +63,11 @@ type Order struct {
 	LastModify int64
 }
 
-var list []*Order = []*Order{}
+var list = []*Order{}
 
 var logger *log.Logger
 
-var stop bool = false
+var stop = false
 
 func loop() {
 	fmt.Println("Loop interval:", interval)
