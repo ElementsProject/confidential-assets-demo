@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-type ExchangeRateTuple struct {
+type exchangeRateTuple struct {
 	Rate float64 `json:"rate"`
 	Min  int64   `json:"min"`
 	Max  int64   `json:"max"`
@@ -33,25 +33,25 @@ const (
 	myActorName      = "charlie"
 	defaultRateFrom  = "AKISKY"
 	defaultRateTo    = "MELON"
-	defaultRpcURL    = "http://127.0.0.1:10020"
-	defaultRpcUser   = "user"
-	defaultPpcPass   = "pass"
+	defaultRPCURL    = "http://127.0.0.1:10020"
+	defaultRPCUser   = "user"
+	defaultRPCPass   = "pass"
 	defaultLocalAddr = ":8020"
 	defaultTxPath    = "elements-tx"
 	defaultTxOption  = ""
 	defaultTimeout   = 600
 )
 
-var logger *log.Logger = log.New(os.Stdout, myActorName+":", log.LstdFlags+log.Lshortfile)
+var logger = log.New(os.Stdout, myActorName+":", log.LstdFlags+log.Lshortfile)
 var conf = democonf.NewDemoConf(myActorName)
-var assetIdMap = make(map[string]string)
+var assetIDMap = make(map[string]string)
 var lockList = make(rpc.LockList)
 var rpcClient *rpc.Rpc
 var elementsTxCommand string
 var elementsTxOption string
 var localAddr string
-var defaultRateTuple ExchangeRateTuple = ExchangeRateTuple{Rate: 0.5, Min: 100, Max: 200000, Unit: 20, Fee: 15}
-var fixedRateTable = make(map[string](map[string]ExchangeRateTuple))
+var defaultRateTuple = exchangeRateTuple{Rate: 0.5, Min: 100, Max: 200000, Unit: 20, Fee: 15}
+var fixedRateTable = make(map[string](map[string]exchangeRateTuple))
 
 var handlerList = map[string]func(url.Values, string) ([]byte, error){
 	"/getexchangerate/":    doGetRate,
@@ -260,7 +260,7 @@ func createTransactionTemplate(requestAsset string, requestAmount int64, offer s
 		params = append(params, txin)
 	}
 
-	outAddrOffer := "outaddr=" + strconv.FormatInt(cost, 10) + ":" + addrOffer + ":" + assetIdMap[offer]
+	outAddrOffer := "outaddr=" + strconv.FormatInt(cost, 10) + ":" + addrOffer + ":" + assetIDMap[offer]
 	params = append(params, outAddrOffer)
 
 	if 0 < change {
@@ -268,7 +268,7 @@ func createTransactionTemplate(requestAsset string, requestAmount int64, offer s
 		if err != nil {
 			return "", err
 		}
-		outAddrChange := "outaddr=" + strconv.FormatInt(change, 10) + ":" + addrChange + ":" + assetIdMap[requestAsset]
+		outAddrChange := "outaddr=" + strconv.FormatInt(change, 10) + ":" + addrChange + ":" + assetIDMap[requestAsset]
 		params = append(params, outAddrChange)
 	}
 
@@ -308,7 +308,7 @@ func createTransactionTemplateWB(requestAsset string, requestAmount int64, offer
 		params = append(params, txin)
 	}
 
-	outAddrOffer := "outaddr=" + strconv.FormatInt(lbChange, 10) + ":" + addrOffer + ":" + assetIdMap[offer]
+	outAddrOffer := "outaddr=" + strconv.FormatInt(lbChange, 10) + ":" + addrOffer + ":" + assetIDMap[offer]
 	params = append(params, outAddrOffer)
 
 	if 0 < change {
@@ -316,10 +316,10 @@ func createTransactionTemplateWB(requestAsset string, requestAmount int64, offer
 		if err != nil {
 			return "", err
 		}
-		outAddrChange := "outaddr=" + strconv.FormatInt(change, 10) + ":" + addrChange + ":" + assetIdMap[requestAsset]
+		outAddrChange := "outaddr=" + strconv.FormatInt(change, 10) + ":" + addrChange + ":" + assetIDMap[requestAsset]
 		params = append(params, outAddrChange)
 	}
-	outAddrFee := "outscript=" + strconv.FormatInt(offerRes.Fee, 10) + "::" + assetIdMap[offer]
+	outAddrFee := "outscript=" + strconv.FormatInt(offerRes.Fee, 10) + "::" + assetIDMap[offer]
 	params = append(params, outAddrFee)
 
 	out, err := exec.Command(elementsTxCommand, params...).Output()
@@ -423,20 +423,20 @@ func initialize() {
 	lib.SetLogger(logger)
 
 	rpcClient = rpc.NewRpc(
-		conf.GetString("rpcurl", defaultRpcURL),
-		conf.GetString("rpcuser", defaultRpcUser),
-		conf.GetString("rpcpass", defaultPpcPass))
-	_, err := rpcClient.RequestAndUnmarshalResult(&assetIdMap, "dumpassetlabels")
+		conf.GetString("rpcurl", defaultRPCURL),
+		conf.GetString("rpcuser", defaultRPCUser),
+		conf.GetString("rpcpass", defaultRPCPass))
+	_, err := rpcClient.RequestAndUnmarshalResult(&assetIDMap, "dumpassetlabels")
 	if err != nil {
 		logger.Println("RPC/dumpassetlabels error:", err)
 	}
-	delete(assetIdMap, "bitcoin")
+	delete(assetIDMap, "bitcoin")
 
 	localAddr = conf.GetString("laddr", defaultLocalAddr)
 	elementsTxCommand = conf.GetString("txpath", defaultTxPath)
 	elementsTxOption = conf.GetString("txoption", defaultTxOption)
 	rpc.SetUtxoLockDuration(time.Duration(int64(conf.GetNumber("timeout", defaultTimeout))) * time.Second)
-	fixedRateTable[defaultRateFrom] = map[string]ExchangeRateTuple{defaultRateTo: defaultRateTuple}
+	fixedRateTable[defaultRateFrom] = map[string]exchangeRateTuple{defaultRateTo: defaultRateTuple}
 	conf.GetInterface("fixrate", &fixedRateTable)
 }
 

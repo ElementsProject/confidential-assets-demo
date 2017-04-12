@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-// democonf project democonf.go
+// Package democonf externalize setting.
 package democonf
 
 import (
@@ -12,11 +12,13 @@ import (
 	"path/filepath"
 )
 
+// DemoConf represents externalized setting.
 type DemoConf struct {
 	Data   map[string]interface{}
 	logger *log.Logger
 }
 
+// NewDemoConf creates DemoConf with specified section.
 func NewDemoConf(section string) *DemoConf {
 	conf := new(DemoConf)
 	conf.logger = log.New(os.Stdout, "DemoConf:", log.LstdFlags)
@@ -42,6 +44,7 @@ func NewDemoConf(section string) *DemoConf {
 	return conf
 }
 
+// GetString returns config value by string.
 func (conf *DemoConf) GetString(key string, defaultValue string) string {
 	val, ok := conf.Data[key]
 	if !ok {
@@ -56,6 +59,7 @@ func (conf *DemoConf) GetString(key string, defaultValue string) string {
 	return str
 }
 
+// GetNumber returns config value by number(float64).
 func (conf *DemoConf) GetNumber(key string, defaultValue float64) float64 {
 	val, ok := conf.Data[key]
 	if !ok {
@@ -70,6 +74,7 @@ func (conf *DemoConf) GetNumber(key string, defaultValue float64) float64 {
 	return num
 }
 
+// GetBool returns config value by bool.
 func (conf *DemoConf) GetBool(key string, defaultValue bool) bool {
 	val, ok := conf.Data[key]
 	if !ok {
@@ -84,6 +89,7 @@ func (conf *DemoConf) GetBool(key string, defaultValue bool) bool {
 	return b
 }
 
+// GetInterface returns config value by interface{}
 func (conf *DemoConf) GetInterface(key string, result interface{}) {
 	val, ok := conf.Data[key]
 	if !ok {
@@ -97,9 +103,8 @@ func (conf *DemoConf) GetInterface(key string, result interface{}) {
 		if !ok {
 			conf.logger.Printf("type is neither map[string]interface{} nor []interface{}. Type: %T, Value: %+v\n", val, val)
 			return
-		} else {
-			bs, _ = json.Marshal(a)
 		}
+		bs, _ = json.Marshal(a)
 	} else {
 		bs, _ = json.Marshal(m)
 	}

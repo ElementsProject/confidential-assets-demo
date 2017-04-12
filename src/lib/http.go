@@ -2,9 +2,12 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-/**
- * HTTP related functions
- */
+/*
+Package lib provides HTTP related functions.
+
+There is a very simple http-form/json framework.
+And it is also provides cyclic process management.
+*/
 package lib
 
 import (
@@ -22,17 +25,20 @@ import (
 	"time"
 )
 
+// ExchangeRateRequest is a structure that represents the JSON-API request.
 type ExchangeRateRequest struct {
 	Request map[string]int64 `json:"request"`
 	Offer   string           `json:"offer"`
 }
 
+// ExchangeRateResponse is a structure that represents the JSON-API response.
 type ExchangeRateResponse struct {
 	Fee        int64  `json:"fee"`
 	AssetLabel string `json:"assetid"`
 	Cost       int64  `json:"cost"`
 }
 
+// GetID returns ID of ExchangeRateResponse instance.
 func (u *ExchangeRateResponse) GetID() string {
 	return generateID(fmt.Sprintf("%d:%s:%d", u.Fee, u.AssetLabel, u.Cost))
 }
@@ -47,11 +53,13 @@ func generateID(key string) string {
 	return id
 }
 
+// ExchangeOfferRequest is a structure that represents the JSON-API request.
 type ExchangeOfferRequest struct {
 	Request map[string]int64 `json:"request"`
 	Offer   string           `json:"offer"`
 }
 
+// ExchangeOfferResponse is a structure that represents the JSON-API response.
 type ExchangeOfferResponse struct {
 	Fee         int64  `json:"fee"`
 	AssetLabel  string `json:"assetid"`
@@ -59,16 +67,19 @@ type ExchangeOfferResponse struct {
 	Transaction string `json:"tx"`
 }
 
+// GetID returns ID of ExchangeOfferResponse instance.
 func (u *ExchangeOfferResponse) GetID() string {
 	return generateID(u.Transaction)
 }
 
+// ExchangeOfferWBRequest is a structure that represents the JSON-API request.
 type ExchangeOfferWBRequest struct {
 	Request     map[string]int64 `json:"request"`
 	Offer       string           `json:"offer"`
 	Commitments []string         `json:"commitments"`
 }
 
+// ExchangeOfferWBResponse is a structure that represents the JSON-API response.
 type ExchangeOfferWBResponse struct {
 	Fee         int64    `json:"fee"`
 	AssetLabel  string   `json:"assetid"`
@@ -77,23 +88,28 @@ type ExchangeOfferWBResponse struct {
 	Commitments []string `json:"commitments"`
 }
 
+// GetID returns ID of ExchangeOfferWBResponse instance.
 func (u *ExchangeOfferWBResponse) GetID() string {
 	return generateID(u.Transaction)
 }
 
+// SubmitExchangeRequest is a structure that represents the JSON-API request.
 type SubmitExchangeRequest struct {
 	Transaction string `json:"tx"`
 }
 
+// SubmitExchangeResponse is a structure that represents the JSON-API response.
 type SubmitExchangeResponse struct {
 	TransactionId string `json:"txid"`
 }
 
+// ErrorResponse is a structure that represents the JSON-API response.
 type ErrorResponse struct {
 	Result  bool   `json:"result"`
 	Message string `json:"message"`
 }
 
+// CyclicProcess is a structure that holds function and its calling interval.
 type CyclicProcess struct {
 	Handler  func()
 	Interval int
@@ -101,6 +117,7 @@ type CyclicProcess struct {
 
 var logger *log.Logger
 
+// SetLogger sets logger.
 func SetLogger(loggerIn *log.Logger) {
 	logger = loggerIn
 }
@@ -176,6 +193,7 @@ func generateMuxHandler(h func(url.Values, string) ([]byte, error)) func(http.Re
 	}
 }
 
+// StartHttpServer binds specific URL and handler function. And it starts http server.
 func StartHttpServer(laddr string, handlers map[string]func(url.Values, string) ([]byte, error), filepath string) (net.Listener, error) {
 	listener, err := net.Listen("tcp", laddr)
 	if err != nil {
@@ -194,6 +212,7 @@ func StartHttpServer(laddr string, handlers map[string]func(url.Values, string) 
 	return listener, err
 }
 
+// StartCyclicProc calls each function with each interval.
 func StartCyclicProc(cps []CyclicProcess, stop *bool) {
 	for _, cyclic := range cps {
 		go func() {
@@ -209,6 +228,7 @@ func StartCyclicProc(cps []CyclicProcess, stop *bool) {
 	}
 }
 
+// WaitStopSignal waits stop flag to be true.
 func WaitStopSignal(stop *bool) {
 	for {
 		time.Sleep(1 * time.Second)
