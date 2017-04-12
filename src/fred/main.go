@@ -18,13 +18,13 @@ import (
 )
 
 // URL for accessing RPC
-var rpcurl string = "http://127.0.0.1:10040"
+var rpcurl = "http://127.0.0.1:10040"
 
 // ID for accessing RPC
-var rpcuser string = "user"
+var rpcuser = "user"
 
 // Password for accessing RPC
-var rpcpass string = "pass"
+var rpcpass = "pass"
 
 var rpcClient *rpc.Rpc
 
@@ -32,7 +32,7 @@ var interval = 3 * time.Second
 
 var logger *log.Logger
 
-var stop bool = false
+var stop = false
 
 func checkgenerate() error {
 	var txs []string
