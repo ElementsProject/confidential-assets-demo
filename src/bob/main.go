@@ -17,14 +17,17 @@ import (
 	"rpc"
 )
 
+// Block with Transactions
 type Block struct {
 	Tx []string `json:"tx,"`
 }
 
+// Transaction with Outputs
 type Transaction struct {
 	Vout []Output `json:"vout,"`
 }
 
+// Output format
 type Output struct {
 	Value        float64                `json:"value,"`
 	Fee          float64                `json:"fee_value,"`
@@ -36,9 +39,9 @@ type Output struct {
 
 const interval = 3 * time.Second
 
-var rpcurl string = "http://127.0.0.1:10010"
-var rpcuser string = "user"
-var rpcpass string = "pass"
+var rpcurl = "http://127.0.0.1:10010"
+var rpcuser = "user"
+var rpcpass = "pass"
 
 var rpcClient *rpc.Rpc
 
@@ -46,7 +49,7 @@ var assets = make(map[string]string)
 
 var logger *log.Logger
 
-var stop bool = false
+var stop = false
 
 func getblockcount() (int, error) {
 	blockcount, res, err := rpcClient.RequestAndCastNumber("getblockcount")
