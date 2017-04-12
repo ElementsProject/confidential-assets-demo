@@ -26,10 +26,13 @@ import (
 	"time"
 )
 
+// UserOfferRequest is a structure that represents the web-form for "/walletinfo" request.
 type UserOfferRequest struct {
 	Offer string `json:"offer"`
 	Cost  int64  `json:"cost"`
 }
+
+// UserOfferResByAsset is a structure for UserOfferResponse.
 type UserOfferResByAsset struct {
 	Fee         int64  `json:"fee"`
 	Cost        int64  `json:"cost"`
@@ -37,24 +40,27 @@ type UserOfferResByAsset struct {
 	Transaction string `json:"-"`
 }
 
+// UserOfferResponse is a map that represents the response for "/offer" request.
 type UserOfferResponse map[string]UserOfferResByAsset
 
+// UserSendResponse is a structure that represents the response for "/send" request.
 type UserSendResponse struct {
 	Result  bool   `json:"result"`
 	Message string `json:"message"`
 }
 
-type UserWalletInfoRes struct {
+// UserWalletinfoResponse is a structure that represents the response for "/walletinfo" request.
+type UserWalletinfoResponse struct {
 	Balance rpc.BalanceMap `json:"balance"`
 }
 
-type Quotation struct {
+type quotation struct {
 	RequestAsset  string
 	RequestAmount int64
 	Offer         map[string]UserOfferResByAsset
 }
 
-func (e *Quotation) getID() string {
+func (e *quotation) getID() string {
 	now := time.Now().Unix()
 	target := make([]byte, binary.MaxVarintLen64)
 	binary.PutVarint(target, now)
@@ -71,9 +77,9 @@ func (e *Quotation) getID() string {
 
 const (
 	myActorName          = "alice"
-	defaultRpcURL        = "http://127.0.0.1:10000"
-	defaultRpcUser       = "user"
-	defaultPpcPass       = "pass"
+	defaultRPCURL        = "http://127.0.0.1:10000"
+	defaultRPCUser       = "user"
+	defaultRPCPass       = "pass"
 	defaultLocalAddr     = ":8000"
 	defaultTxPath        = "elements-tx"
 	defaultTxOption      = ""
@@ -82,15 +88,15 @@ const (
 	defaultExchLocalAddr = ":8020"
 )
 
-var logger *log.Logger = log.New(os.Stdout, myActorName+":", log.LstdFlags+log.Lshortfile)
+var logger = log.New(os.Stdout, myActorName+":", log.LstdFlags+log.Lshortfile)
 var conf = democonf.NewDemoConf(myActorName)
-var assetIdMap = make(map[string]string)
+var assetIDMap = make(map[string]string)
 var lockList = make(rpc.LockList)
 var rpcClient *rpc.Rpc
 var elementsTxCommand string
 var elementsTxOption string
 var localAddr string
-var quotationList = make(map[string]Quotation)
+var quotationList = make(map[string]quotation)
 var exchangerConf = democonf.NewDemoConf(exchangerName)
 var exchangeRateURL string
 var exchangeOfferWBURL string
@@ -126,7 +132,7 @@ func doWalletInfo(reqParam url.Values, reqBody string) ([]byte, error) {
 		return nil, err
 	}
 
-	walletInfoRes := UserWalletInfoRes{
+	walletInfoRes := UserWalletinfoResponse{
 		Balance: balance,
 	}
 
@@ -142,8 +148,8 @@ func doWalletInfo(reqParam url.Values, reqBody string) ([]byte, error) {
 }
 
 func chooseKnownAssets(b rpc.BalanceMap) {
-	for k, _ := range b {
-		if _, ok := assetIdMap[k]; !ok {
+	for k := range b {
+		if _, ok := assetIDMap[k]; !ok {
 			delete(b, k)
 		}
 	}
@@ -152,11 +158,11 @@ func chooseKnownAssets(b rpc.BalanceMap) {
 
 func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
 	userOfferResponse := make(UserOfferResponse)
-	var quotation Quotation
+	var quotation quotation
 
 	tmp, ok := reqParam["asset"]
 	if !ok {
-		err := fmt.Errorf("no offer asset label found:")
+		err := fmt.Errorf("no offer asset label found")
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -170,7 +176,7 @@ func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
 
 	tmp, ok = reqParam["cost"]
 	if !ok {
-		err := fmt.Errorf("no offer asset amount found:")
+		err := fmt.Errorf("no offer asset amount found")
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -194,7 +200,7 @@ func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
 	quotation.RequestAmount = requestAmount
 	quotation.Offer = make(map[string]UserOfferResByAsset)
 	offerExists := false
-	for offerAsset, _ := range balance {
+	for offerAsset := range balance {
 		if offerAsset == requestAsset {
 			continue
 		}
@@ -247,11 +253,11 @@ func appendTransactionInfo(sendToAddr string, sendAsset string, sendAmount int64
 		if err != nil {
 			return "", err
 		}
-		outAddrChange := "outaddr=" + strconv.FormatInt(change, 10) + ":" + addrChange + ":" + assetIdMap[offerAsset]
+		outAddrChange := "outaddr=" + strconv.FormatInt(change, 10) + ":" + addrChange + ":" + assetIDMap[offerAsset]
 		params = append(params, outAddrChange)
 	}
-	outAddrSend := "outaddr=" + strconv.FormatInt(sendAmount, 10) + ":" + sendToAddr + ":" + assetIdMap[sendAsset]
-	outAddrFee := "outscript=" + strconv.FormatInt(fee, 10) + "::" + assetIdMap[offerAsset]
+	outAddrSend := "outaddr=" + strconv.FormatInt(sendAmount, 10) + ":" + sendToAddr + ":" + assetIDMap[sendAsset]
+	outAddrFee := "outscript=" + strconv.FormatInt(fee, 10) + "::" + assetIDMap[offerAsset]
 	params = append(params, outAddrSend, outAddrFee)
 
 	out, err := exec.Command(elementsTxCommand, params...).Output()
@@ -292,7 +298,7 @@ func appendTransactionInfoWB(sendToAddr string, sendAsset string, sendAmount int
 		if err != nil {
 			return "", err
 		}
-		outAddrChange := "outaddr=" + strconv.FormatInt(change, 10) + ":" + addrChange + ":" + assetIdMap[offerAsset]
+		outAddrChange := "outaddr=" + strconv.FormatInt(change, 10) + ":" + addrChange + ":" + assetIDMap[offerAsset]
 		params = append(params, outAddrChange)
 	}
 	if 0 < lbChange {
@@ -300,10 +306,10 @@ func appendTransactionInfoWB(sendToAddr string, sendAsset string, sendAmount int
 		if err != nil {
 			return "", err
 		}
-		outAddrLbChange := "outaddr=" + strconv.FormatInt(lbChange, 10) + ":" + addrLbChange + ":" + assetIdMap[sendAsset]
+		outAddrLbChange := "outaddr=" + strconv.FormatInt(lbChange, 10) + ":" + addrLbChange + ":" + assetIDMap[sendAsset]
 		params = append(params, outAddrLbChange)
 	}
-	outAddrSend := "outaddr=" + strconv.FormatInt(sendAmount, 10) + ":" + sendToAddr + ":" + assetIdMap[sendAsset]
+	outAddrSend := "outaddr=" + strconv.FormatInt(sendAmount, 10) + ":" + sendToAddr + ":" + assetIDMap[sendAsset]
 	params = append(params, outAddrSend)
 
 	out, err := exec.Command(elementsTxCommand, params...).Output()
@@ -320,7 +326,7 @@ func appendTransactionInfoWB(sendToAddr string, sendAsset string, sendAmount int
 func doSend(reqParam url.Values, reqBody string) ([]byte, error) {
 	tmp, ok := reqParam["id"]
 	if !ok {
-		err := fmt.Errorf("no id found:")
+		err := fmt.Errorf("no id found")
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -334,7 +340,7 @@ func doSend(reqParam url.Values, reqBody string) ([]byte, error) {
 
 	tmp, ok = reqParam["addr"]
 	if !ok {
-		err := fmt.Errorf("no addr found:")
+		err := fmt.Errorf("no addr found")
 		logger.Println("error:", err)
 		return nil, err
 	}
@@ -512,10 +518,10 @@ func doSendWithNoBlinding(offerID string, sendToAddr string) (UserSendResponse, 
 	return userSendResponse, err
 }
 
-func getQuotation(ql map[string]Quotation, offerID string) (string, string, error) {
+func getQuotation(ql map[string]quotation, offerID string) (string, string, error) {
 	var quotationID string
 	var offerAsset string
-	var found bool = false
+	found := false
 
 	for i, v := range ql {
 		for k, w := range v.Offer {
@@ -626,15 +632,15 @@ func submitexchange(tx string) (lib.SubmitExchangeResponse, error) {
 	return submitRes, err
 }
 
-func callExchangerAPI(targetUrl string, param interface{}, result interface{}) (*http.Response, error) {
-	encoded_request, err := json.Marshal(param)
+func callExchangerAPI(targetURL string, param interface{}, result interface{}) (*http.Response, error) {
+	encodedRequest, err := json.Marshal(param)
 	if err != nil {
 		logger.Println("json#Marshal error:", err)
 		return nil, err
 	}
 	client := &http.Client{}
-	reqBody := string(encoded_request)
-	req, err := http.NewRequest("POST", targetUrl, bytes.NewBufferString(reqBody))
+	reqBody := string(encodedRequest)
+	req, err := http.NewRequest("POST", targetURL, bytes.NewBufferString(reqBody))
 	fmt.Println(req)
 	if err != nil {
 		logger.Println("http#NewRequest error", err)
@@ -664,14 +670,14 @@ func initialize() {
 	lib.SetLogger(logger)
 
 	rpcClient = rpc.NewRpc(
-		conf.GetString("rpcurl", defaultRpcURL),
-		conf.GetString("rpcuser", defaultRpcUser),
-		conf.GetString("rpcpass", defaultPpcPass))
-	_, err := rpcClient.RequestAndUnmarshalResult(&assetIdMap, "dumpassetlabels")
+		conf.GetString("rpcurl", defaultRPCURL),
+		conf.GetString("rpcuser", defaultRPCUser),
+		conf.GetString("rpcpass", defaultRPCPass))
+	_, err := rpcClient.RequestAndUnmarshalResult(&assetIDMap, "dumpassetlabels")
 	if err != nil {
 		logger.Println("RPC/dumpassetlabels error:", err)
 	}
-	delete(assetIdMap, "bitcoin")
+	delete(assetIDMap, "bitcoin")
 
 	localAddr = conf.GetString("laddr", defaultLocalAddr)
 	elementsTxCommand = conf.GetString("txpath", defaultTxPath)
