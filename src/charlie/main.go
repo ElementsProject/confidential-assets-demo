@@ -416,7 +416,9 @@ func main() {
 	}
 	defer func() {
 		e := listener.Close()
-		logger.Println("error:", e)
+		if e != nil {
+			logger.Println("error:", e)
+		}
 	}()
 
 	// signal handling (ctrl + c)

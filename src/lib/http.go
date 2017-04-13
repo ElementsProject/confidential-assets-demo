@@ -154,7 +154,9 @@ func handler(w http.ResponseWriter, r *http.Request, fi interface{}, n string) {
 
 	defer func() {
 		e := r.Body.Close()
-		logger.Println("error:", e)
+		if e != nil {
+			logger.Println("error:", e)
+		}
 	}()
 
 	switch r.Method {
@@ -352,7 +354,9 @@ func StartHTTPServer(laddr string, handlers map[string]interface{}, filepath str
 	mux.Handle("/", http.FileServer(http.Dir(filepath)))
 	go func() {
 		e := http.Serve(listener, mux)
-		logger.Println("error:", e)
+		if e != nil {
+			logger.Println("error:", e)
+		}
 	}()
 
 	return listener, err
