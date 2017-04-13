@@ -22,6 +22,8 @@ import (
 	"net/url"
 	"reflect"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -100,7 +102,7 @@ type SubmitExchangeRequest struct {
 
 // SubmitExchangeResponse is a structure that represents the JSON-API response.
 type SubmitExchangeResponse struct {
-	TransactionId string `json:"txid"`
+	TransactionID string `json:"txid"`
 }
 
 // ErrorResponse is a structure that represents the JSON-API response.
@@ -130,50 +132,159 @@ func createErrorByteArray(e error) []byte {
 		Result:  false,
 		Message: fmt.Sprintf("%s", e),
 	}
-	b, _ := json.Marshal(res)
+	b, err := json.Marshal(res)
+	if err != nil {
+		logger.Println("error:", err)
+	}
 	return b
 }
 
-func handler(w http.ResponseWriter, r *http.Request, f func(url.Values, string) ([]byte, error), n string) {
+func handler(w http.ResponseWriter, r *http.Request, fi interface{}, n string) {
+
 	w.Header().Add("Access-Control-Allow-Origin", "*")
 	w.Header().Add("Access-Control-Allow-Methods", "GET")
 	w.Header().Add("Access-Control-Allow-Headers", r.Header.Get("Access-Control-Request-Headers"))
 	w.Header().Add("Access-Control-Max-Age", "-1")
 
 	status := http.StatusOK
-	var res []byte
+	createParam := formToFlatStruct
+	var res interface{}
 	var err error
-	defer r.Body.Close()
+	var fp0e reflect.Value
+
+	defer func() {
+		e := r.Body.Close()
+		logger.Println("error:", e)
+	}()
 
 	switch r.Method {
 	case "GET":
-		r.ParseForm()
-		logger.Println("start:", n)
-		res, err = f(r.Form, "")
-		logger.Println("end:", n)
-
 	case "POST":
-		req, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			status = http.StatusInternalServerError
-			logger.Println("ioutil#ReadAll error:", err)
-			_, _ = w.Write(nil)
+		ct := strings.Split(""+r.Header.Get("Content-Type"), ";")[0]
+		switch ct {
+		case "application/x-www-form-urlencoded":
+		case "application/json", "text/plain":
+			createParam = jsonToStruct
+		default:
+			status = http.StatusBadRequest
+			err = fmt.Errorf("content-type not allowed:%s", ct)
+			logger.Println("error:", err)
+			handleTermninate(w, res, status, err)
 			return
 		}
-		logger.Println("start:", n)
-		res, err = f(nil, string(req))
-		logger.Println("end:", n)
-
 	default:
 		status = http.StatusMethodNotAllowed
+		err = fmt.Errorf("method not allowed:%s", r.Method)
+		logger.Println("error:", err)
+		handleTermninate(w, res, status, err)
+		return
 	}
 
+	fp0e, err = createParam(r, fi)
 	if err != nil {
-		logger.Println("error:", err)
 		status = http.StatusInternalServerError
-		if res != nil {
-			res = createErrorByteArray(err)
+		logger.Println("error:", err)
+		handleTermninate(w, res, status, err)
+		return
+	}
+
+	fv := reflect.ValueOf(fi)
+	logger.Println("start:", n)
+	result := fv.Call([]reflect.Value{fp0e})
+	logger.Println("end:", n)
+
+	if err, ok := result[1].Interface().(error); ok {
+		status = http.StatusInternalServerError
+		logger.Println("error:", err)
+		handleTermninate(w, res, status, err)
+	}
+
+	handleTermninate(w, result[0].Interface(), status, nil)
+
+	return
+}
+
+func formToFlatStruct(r *http.Request, fi interface{}) (reflect.Value, error) {
+	var formValue reflect.Value
+
+	err := r.ParseForm()
+	if err != nil {
+		logger.Println("http.Request#ParseForm error:", err)
+		return formValue, err
+	}
+
+	fv := reflect.ValueOf(fi)
+	fp0t := fv.Type().In(0)
+	fp0v := reflect.New(fp0t)
+	formValue = fp0v.Elem()
+
+	for i := 0; i < fp0t.NumField(); i++ {
+		sfv := formValue.Field(i)
+
+		if !sfv.CanSet() {
+			continue
 		}
+
+		paramv := getParamByNameIgnoreCase(r.Form, fp0t.Field(i).Name)
+		switch sfv.Kind() {
+		case reflect.String:
+			sfv.SetString(paramv)
+		case reflect.Int64:
+			val, err := strconv.ParseInt(paramv, 10, 64)
+			if err != nil {
+				break
+			}
+			sfv.SetInt(val)
+		default:
+		}
+	}
+
+	return formValue, nil
+}
+
+func getParamByNameIgnoreCase(form url.Values, key string) string {
+	lkey := strings.ToLower(key)
+	var value string
+	for k, v := range form {
+		if strings.ToLower(k) == lkey {
+			value = v[0]
+		}
+	}
+	return value
+}
+
+func jsonToStruct(r *http.Request, fi interface{}) (reflect.Value, error) {
+	var fp0e reflect.Value
+
+	reqBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		logger.Println("ioutil#ReadAll error:", err)
+		return fp0e, err
+	}
+
+	fv := reflect.ValueOf(fi)
+	fp0v := reflect.New(fv.Type().In(0))
+	fp0i := fp0v.Interface()
+
+	err = json.Unmarshal(reqBody, fp0i)
+	if err != nil {
+		logger.Println("json#Unmarshal error:", err)
+		return fp0e, err
+	}
+
+	return fp0v.Elem(), nil
+}
+
+func handleTermninate(w http.ResponseWriter, resif interface{}, status int, err error) {
+	if resif == nil && err != nil {
+		resif = err
+	}
+
+	res, err := json.Marshal(resif)
+	if err != nil {
+		status = http.StatusInternalServerError
+		logger.Println("json#Marshal error:", err)
+		res = createErrorByteArray(err)
 	}
 
 	w.WriteHeader(status)
@@ -184,7 +295,7 @@ func handler(w http.ResponseWriter, r *http.Request, f func(url.Values, string) 
 	}
 }
 
-func generateMuxHandler(h func(url.Values, string) ([]byte, error)) func(http.ResponseWriter, *http.Request) {
+func generateMuxHandler(h interface{}) func(http.ResponseWriter, *http.Request) {
 	fv := reflect.ValueOf(h)
 	n := runtime.FuncForPC(fv.Pointer()).Name()
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -193,8 +304,8 @@ func generateMuxHandler(h func(url.Values, string) ([]byte, error)) func(http.Re
 	}
 }
 
-// StartHttpServer binds specific URL and handler function. And it starts http server.
-func StartHttpServer(laddr string, handlers map[string]func(url.Values, string) ([]byte, error), filepath string) (net.Listener, error) {
+// StartHTTPServer binds specific URL and handler function. And it starts http server.
+func StartHTTPServer(laddr string, handlers map[string]interface{}, filepath string) (net.Listener, error) {
 	listener, err := net.Listen("tcp", laddr)
 	if err != nil {
 		return listener, err
@@ -202,12 +313,47 @@ func StartHttpServer(laddr string, handlers map[string]func(url.Values, string) 
 
 	mux := http.NewServeMux()
 	for p, h := range handlers {
+		hv := reflect.ValueOf(h)
+		if !hv.IsValid() {
+			return listener, fmt.Errorf("handler is invalid")
+		}
+		if hv.Kind() != reflect.Func {
+			return listener, fmt.Errorf("each handler must be a function")
+		}
+		funcname := runtime.FuncForPC(hv.Pointer()).Name()
+		ht := hv.Type()
+		if ht.NumIn() != 1 {
+			return listener, fmt.Errorf("[%s] must have one input. but it has %d", funcname, ht.NumIn())
+		}
+		hi0t := ht.In(0)
+		if hi0t.Kind() != reflect.Struct {
+			return listener, fmt.Errorf("[%s] input must be a struct", funcname)
+		}
+		if ht.NumOut() != 2 {
+			return listener, fmt.Errorf("[%s] must have two output. but it has %d", funcname, ht.NumOut())
+		}
+		ho0t := ht.Out(0)
+		if (ho0t.Kind() != reflect.Struct) && (ho0t.Kind() != reflect.Map) {
+			return listener, fmt.Errorf("[%s] 1st output must be a struct or a map", funcname)
+		}
+		ho1t := ht.Out(1)
+		if ho1t.Kind() != reflect.Interface {
+			return listener, fmt.Errorf("[%s] 2nd output must be a interface", funcname)
+		}
+		errorType := reflect.TypeOf((*error)(nil)).Elem()
+		if !ho1t.Implements(errorType) {
+			return listener, fmt.Errorf("[%s] 2nd output must implements error", funcname)
+		}
+
 		f := generateMuxHandler(h)
 		mux.HandleFunc(p, f)
 	}
 
 	mux.Handle("/", http.FileServer(http.Dir(filepath)))
-	go http.Serve(listener, mux)
+	go func() {
+		e := http.Serve(listener, mux)
+		logger.Println("error:", e)
+	}()
 
 	return listener, err
 }
@@ -215,14 +361,15 @@ func StartHttpServer(laddr string, handlers map[string]func(url.Values, string) 
 // StartCyclicProc calls each function with each interval.
 func StartCyclicProc(cps []CyclicProcess, stop *bool) {
 	for _, cyclic := range cps {
+		c := cyclic
 		go func() {
-			logger.Println("Loop interval:", cyclic.Interval)
+			logger.Println("Loop interval:", c.Interval)
 			for {
-				time.Sleep(time.Duration(cyclic.Interval) * time.Second)
+				time.Sleep(time.Duration(c.Interval) * time.Second)
 				if *stop {
 					break
 				}
-				cyclic.Handler()
+				c.Handler()
 			}
 		}()
 	}
