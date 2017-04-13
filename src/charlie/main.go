@@ -6,11 +6,9 @@ package main
 
 import (
 	"democonf"
-	"encoding/json"
 	"fmt"
 	"lib"
 	"log"
-	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -53,7 +51,7 @@ var localAddr string
 var defaultRateTuple = exchangeRateTuple{Rate: 0.5, Min: 100, Max: 200000, Unit: 20, Fee: 15}
 var fixedRateTable = make(map[string](map[string]exchangeRateTuple))
 
-var handlerList = map[string]func(url.Values, string) ([]byte, error){
+var handlerList = map[string]interface{}{
 	"/getexchangerate/":    doGetRate,
 	"/getexchangeofferwb/": doOfferWithBlinding,
 	"/getexchangeoffer/":   doOffer,
@@ -62,21 +60,17 @@ var handlerList = map[string]func(url.Values, string) ([]byte, error){
 
 var cyclics = []lib.CyclicProcess{lib.CyclicProcess{Handler: lockList.Sweep, Interval: 3}}
 
-func doGetRate(reqParam url.Values, reqBody string) ([]byte, error) {
+func doGetRate(rateRequest lib.ExchangeRateRequest) (lib.ExchangeRateResponse, error) {
+	var rateRes lib.ExchangeRateResponse
 	var requestAsset string
 	var requestAmount int64
-	var rateRequest lib.ExchangeRateRequest
+	var err error
 
-	err := json.Unmarshal([]byte(reqBody), &rateRequest)
-	if err != nil {
-		logger.Println("json#Unmarshal error:", err)
-		return nil, err
-	}
 	request := rateRequest.Request
 	if len(request) != 1 {
 		err = fmt.Errorf("request must be a single record but has:%d", len(request))
 		logger.Println("error:", err)
-		return nil, err
+		return rateRes, err
 	}
 	for k, v := range request {
 		requestAsset = k
@@ -84,38 +78,25 @@ func doGetRate(reqParam url.Values, reqBody string) ([]byte, error) {
 	}
 
 	// 1. lookup config
-	rateRes, err := lookupRate(requestAsset, requestAmount, rateRequest.Offer)
+	rateRes, err = lookupRate(requestAsset, requestAmount, rateRequest.Offer)
 	if err != nil {
 		logger.Println("error:", err)
-		b, _ := json.Marshal(fmt.Sprintf("%v", err))
-		return b, nil
 	}
 
-	b, err := json.Marshal(rateRes)
-	if err != nil {
-		logger.Println("json#Marshal error:", err)
-		return nil, err
-	}
-
-	logger.Println("<<" + string(b))
-	return b, nil
+	return rateRes, err
 }
 
-func doOfferWithBlinding(reqParam url.Values, reqBody string) ([]byte, error) {
+func doOfferWithBlinding(offerRequest lib.ExchangeOfferWBRequest) (lib.ExchangeOfferWBResponse, error) {
+	var offerWBRes lib.ExchangeOfferWBResponse
 	var requestAsset string
 	var requestAmount int64
-	var offerRequest lib.ExchangeOfferWBRequest
+	var err error
 
-	err := json.Unmarshal([]byte(reqBody), &offerRequest)
-	if err != nil {
-		logger.Println("json#Unmarshal error:", err)
-		return nil, err
-	}
 	request := offerRequest.Request
 	if len(request) != 1 {
 		err = fmt.Errorf("request must be a single record but has:%d", len(request))
 		logger.Println("error:", err)
-		return nil, err
+		return offerWBRes, err
 	}
 	for k, v := range request {
 		requestAsset = k
@@ -126,30 +107,33 @@ func doOfferWithBlinding(reqParam url.Values, reqBody string) ([]byte, error) {
 	commitments := offerRequest.Commitments
 
 	// 1. lookup rate
-	offerRes, err := lookupRate(requestAsset, requestAmount, offer)
+	tmp, err := lookupRate(requestAsset, requestAmount, offer)
 	if err != nil {
 		logger.Println("error:", err)
-		b, _ := json.Marshal(fmt.Sprintf("%v", err))
-		return b, nil
+		return offerWBRes, err
 	}
+
+	offerWBRes.Fee = tmp.Fee
+	offerWBRes.AssetLabel = tmp.AssetLabel
+	offerWBRes.Cost = tmp.Cost
 
 	// 2. lookup unspent
 	utxos, err := rpcClient.SearchUnspent(lockList, requestAsset, requestAmount, true)
 	if err != nil {
 		logger.Println("error:", err)
-		return nil, err
+		return offerWBRes, err
 	}
 	rautxos, err := rpcClient.SearchMinimalUnspent(lockList, offer, true)
 	if err != nil {
 		logger.Println("error:", err)
-		return nil, err
+		return offerWBRes, err
 	}
 
 	// 3. creat tx
-	tx, err := createTransactionTemplateWB(requestAsset, requestAmount, offer, offerRes, utxos, rautxos)
+	tx, err := createTransactionTemplateWB(requestAsset, requestAmount, offer, offerWBRes, utxos, rautxos)
 	if err != nil {
 		logger.Println("error:", err)
-		return nil, err
+		return offerWBRes, err
 	}
 
 	// 4. blinding
@@ -157,49 +141,33 @@ func doOfferWithBlinding(reqParam url.Values, reqBody string) ([]byte, error) {
 	resCommitments, err := rpcClient.GetCommitments(cmutxos)
 	if err != nil {
 		logger.Println("error:", err)
-		return nil, err
+		return offerWBRes, err
 	}
 	commitments = append(resCommitments, commitments...)
 
 	blindtx, _, err := rpcClient.RequestAndCastString("blindrawtransaction", tx, commitments)
 	if err != nil {
 		logger.Println("RPC/blindrawtransaction error:", err, tx)
-		return nil, err
+		return offerWBRes, err
 	}
 
-	offerWBRes := lib.ExchangeOfferWBResponse{
-		Fee:         offerRes.Fee,
-		AssetLabel:  offerRes.AssetLabel,
-		Cost:        offerRes.Cost,
-		Transaction: blindtx,
-		Commitments: resCommitments,
-	}
+	offerWBRes.Transaction = blindtx
+	offerWBRes.Commitments = resCommitments
 
-	b, err := json.Marshal(offerWBRes)
-	if err != nil {
-		logger.Println("json#Marshal error:", err)
-		return nil, err
-	}
-
-	logger.Println("<<" + string(b))
-	return b, nil
+	return offerWBRes, nil
 }
 
-func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
+func doOffer(offerRequest lib.ExchangeOfferRequest) (lib.ExchangeOfferResponse, error) {
+	var offerRes lib.ExchangeOfferResponse
 	var requestAsset string
 	var requestAmount int64
-	var offerRequest lib.ExchangeOfferRequest
+	var err error
 
-	err := json.Unmarshal([]byte(reqBody), &offerRequest)
-	if err != nil {
-		logger.Println("json#Unmarshal error:", err)
-		return nil, err
-	}
 	request := offerRequest.Request
 	if len(request) != 1 {
 		err = fmt.Errorf("request must be a single record but has:%d", len(request))
 		logger.Println("error:", err)
-		return nil, err
+		return offerRes, err
 	}
 	for k, v := range request {
 		requestAsset = k
@@ -209,41 +177,40 @@ func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
 	offer := offerRequest.Offer
 
 	// 1. lookup config
-	offerRes, err := lookupRate(requestAsset, requestAmount, offer)
+	tmp, err := lookupRate(requestAsset, requestAmount, offer)
 	if err != nil {
 		logger.Println("error:", err)
-		b, _ := json.Marshal(fmt.Sprintf("%v", err))
-		return b, nil
+		return offerRes, err
 	}
+
+	offerRes.Fee = tmp.Fee
+	offerRes.AssetLabel = tmp.AssetLabel
+	offerRes.Cost = tmp.Cost
 
 	// 2. lookup unspent
 	utxos, err := rpcClient.SearchUnspent(lockList, requestAsset, requestAmount, false)
 	if err != nil {
 		logger.Println("error:", err)
-		return nil, err
+		return offerRes, err
 	}
 
 	// 3. creat tx
 	offerRes.Transaction, err = createTransactionTemplate(requestAsset, requestAmount, offer, offerRes.Cost, utxos)
 	if err != nil {
 		logger.Println("error:", err)
-		return nil, err
 	}
 
-	b, err := json.Marshal(offerRes)
-	if err != nil {
-		logger.Println("json#Marshal error:", err)
-		return nil, err
-	}
-
-	logger.Println("<<" + string(b))
-	return b, nil
+	return offerRes, err
 }
 
 func createTransactionTemplate(requestAsset string, requestAmount int64, offer string, cost int64, utxos rpc.UnspentList) (string, error) {
+	var addrOffer string
+	var addrChange string
+	var err error
+
 	change := utxos.GetAmount() - requestAmount
 
-	addrOffer, err := rpcClient.GetNewAddr(false)
+	addrOffer, err = rpcClient.GetNewAddr(false)
 	if err != nil {
 		return "", err
 	}
@@ -264,7 +231,7 @@ func createTransactionTemplate(requestAsset string, requestAmount int64, offer s
 	params = append(params, outAddrOffer)
 
 	if 0 < change {
-		addrChange, err := rpcClient.GetNewAddr(false)
+		addrChange, err = rpcClient.GetNewAddr(false)
 		if err != nil {
 			return "", err
 		}
@@ -283,11 +250,15 @@ func createTransactionTemplate(requestAsset string, requestAmount int64, offer s
 	return txTemplate, nil
 }
 
-func createTransactionTemplateWB(requestAsset string, requestAmount int64, offer string, offerRes lib.ExchangeOfferResponse, utxos rpc.UnspentList, loopbackUtxos rpc.UnspentList) (string, error) {
+func createTransactionTemplateWB(requestAsset string, requestAmount int64, offer string, offerRes lib.ExchangeOfferWBResponse, utxos rpc.UnspentList, loopbackUtxos rpc.UnspentList) (string, error) {
+	var addrOffer string
+	var addrChange string
+	var err error
+
 	change := utxos.GetAmount() - requestAmount
 	lbChange := loopbackUtxos.GetAmount() + offerRes.Cost
 
-	addrOffer, err := rpcClient.GetNewAddr(true)
+	addrOffer, err = rpcClient.GetNewAddr(true)
 	if err != nil {
 		return "", err
 	}
@@ -312,7 +283,7 @@ func createTransactionTemplateWB(requestAsset string, requestAmount int64, offer
 	params = append(params, outAddrOffer)
 
 	if 0 < change {
-		addrChange, err := rpcClient.GetNewAddr(true)
+		addrChange, err = rpcClient.GetNewAddr(true)
 		if err != nil {
 			return "", err
 		}
@@ -333,23 +304,18 @@ func createTransactionTemplateWB(requestAsset string, requestAmount int64, offer
 	return txTemplate, nil
 }
 
-func doSubmit(rreqParam url.Values, reqBody string) ([]byte, error) {
+func doSubmit(submitRequest lib.SubmitExchangeRequest) (lib.SubmitExchangeResponse, error) {
+	var submitRes lib.SubmitExchangeResponse
 	var rawTx rpc.RawTransaction
 	var signedtx rpc.SignedTransaction
+	var err error
 
-	var submitRequest lib.SubmitExchangeRequest
-
-	err := json.Unmarshal([]byte(reqBody), &submitRequest)
-	if err != nil {
-		logger.Println("json#Unmarshal error:", err)
-		return nil, err
-	}
 	rcvtx := submitRequest.Transaction
 
 	_, err = rpcClient.RequestAndUnmarshalResult(&rawTx, "decoderawtransaction", rcvtx)
 	if err != nil {
 		logger.Println("RPC/decoderawtransaction error:", err, rcvtx)
-		return nil, err
+		return submitRes, err
 	}
 
 	// TODO check rawTx (consistency with offer etc...)
@@ -357,65 +323,60 @@ func doSubmit(rreqParam url.Values, reqBody string) ([]byte, error) {
 	_, err = rpcClient.RequestAndUnmarshalResult(&signedtx, "signrawtransaction", rcvtx)
 	if err != nil {
 		logger.Println("RPC/signrawtransaction error:", err, rcvtx)
-		return nil, err
+		return submitRes, err
 	}
 
 	txid, _, err := rpcClient.RequestAndCastString("sendrawtransaction", signedtx.Hex)
 	if err != nil {
 		logger.Println("RPC/sendrawtransaction error:", err, signedtx.Hex)
-		return nil, err
+		return submitRes, err
 	}
 
-	submitRes := lib.SubmitExchangeResponse{
-		TransactionId: txid,
-	}
+	submitRes.TransactionID = txid
 
 	for _, v := range rawTx.Vin {
 		lockList.Unlock(v.Txid, v.Vout)
 	}
 
-	b, _ := json.Marshal(submitRes)
-	logger.Println("<<" + string(b))
-	return b, nil
+	return submitRes, nil
 }
 
-func lookupRate(requestAsset string, requestAmount int64, offer string) (lib.ExchangeOfferResponse, error) {
-	var offerRes lib.ExchangeOfferResponse
+func lookupRate(requestAsset string, requestAmount int64, offer string) (lib.ExchangeRateResponse, error) {
+	var rateRes lib.ExchangeRateResponse
 
 	rateMap, ok := fixedRateTable[offer]
 	if !ok {
 		err := fmt.Errorf("no exchange source:%s", offer)
 		logger.Println("error:", err)
-		return offerRes, err
+		return rateRes, err
 	}
 
 	rate, ok := rateMap[requestAsset]
 	if !ok {
 		err := fmt.Errorf("cannot exchange to:%s", requestAsset)
 		logger.Println("error:", err)
-		return offerRes, err
+		return rateRes, err
 	}
 
 	cost := int64(float64(requestAmount) / rate.Rate)
 	if cost < rate.Min {
 		err := fmt.Errorf("cost lower than min value:%d", cost)
 		logger.Println("error:", err)
-		return offerRes, err
+		return rateRes, err
 	}
 	if rate.Max < cost {
 		err := fmt.Errorf("cost higher than max value:%d", cost)
 		logger.Println("error:", err)
-		return offerRes, err
+		return rateRes, err
 	}
 
-	offerRes = lib.ExchangeOfferResponse{
-		Fee:         rate.Fee,
-		AssetLabel:  offer,
-		Cost:        cost,
-		Transaction: "",
+	rateRes = lib.ExchangeRateResponse{
+		Fee:        rate.Fee,
+		AssetLabel: offer,
+		Cost:       cost,
 	}
 
-	return offerRes, nil
+	return rateRes, nil
 }
 
 func initialize() {
@@ -443,13 +404,20 @@ func initialize() {
 func main() {
 	initialize()
 
-	dir, _ := os.Getwd()
-	listener, err := lib.StartHttpServer(localAddr, handlerList, dir+"/html/"+myActorName)
-	defer listener.Close()
+	dir, err := os.Getwd()
 	if err != nil {
 		logger.Println("error:", err)
 		return
 	}
+	listener, err := lib.StartHTTPServer(localAddr, handlerList, dir+"/html/"+myActorName)
+	if err != nil {
+		logger.Println("error:", err)
+		return
+	}
+	defer func() {
+		e := listener.Close()
+		logger.Println("error:", e)
+	}()
 
 	// signal handling (ctrl + c)
 	sig := make(chan os.Signal)

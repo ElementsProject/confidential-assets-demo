@@ -15,7 +15,6 @@ import (
 	"lib"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -26,10 +25,20 @@ import (
 	"time"
 )
 
-// UserOfferRequest is a structure that represents the web-form for "/walletinfo" request.
+// UserWalletInfoRequest is a structure that represents the web-form for "/walletinfo" request.
+type UserWalletInfoRequest struct {
+}
+
+// UserOfferRequest is a structure that represents the web-form for "/offer" request.
 type UserOfferRequest struct {
-	Offer string `json:"offer"`
+	Asset string `json:"asset"`
 	Cost  int64  `json:"cost"`
+}
+
+// UserSendRequest is a structure that represents the web-form for "/send" request.
+type UserSendRequest struct {
+	ID   string `json:"id"`
+	Addr string `json:"addr"`
 }
 
 // UserOfferResByAsset is a structure for UserOfferResponse.
@@ -49,8 +58,8 @@ type UserSendResponse struct {
 	Message string `json:"message"`
 }
 
-// UserWalletinfoResponse is a structure that represents the response for "/walletinfo" request.
-type UserWalletinfoResponse struct {
+// UserWalletInfoResponse is a structure that represents the response for "/walletinfo" request.
+type UserWalletInfoResponse struct {
 	Balance rpc.BalanceMap `json:"balance"`
 }
 
@@ -103,7 +112,7 @@ var exchangeOfferWBURL string
 var exchangeOfferURL string
 var exchangeSubmitURL string
 
-var handlerList = map[string]func(url.Values, string) ([]byte, error){
+var handlerList = map[string]interface{}{
 	"/walletinfo": doWalletInfo,
 	"/offer":      doOffer,
 	"/send":       doSend,
@@ -125,26 +134,18 @@ func getMyBalance() (rpc.BalanceMap, error) {
 	return wallet.Balance, nil
 }
 
-func doWalletInfo(reqParam url.Values, reqBody string) ([]byte, error) {
+func doWalletInfo(reqForm UserWalletInfoRequest) (UserWalletInfoResponse, error) {
+	var walletInfoRes UserWalletInfoResponse
+
 	balance, err := getMyBalance()
 	if err != nil {
 		logger.Println("error:", err)
-		return nil, err
+		return walletInfoRes, err
 	}
 
-	walletInfoRes := UserWalletinfoResponse{
-		Balance: balance,
-	}
+	walletInfoRes.Balance = balance
 
-	b, err := json.Marshal(walletInfoRes)
-	if err != nil {
-		logger.Println("json#Marshal error:", err)
-		return nil, err
-	}
-
-	logger.Println("<<" + string(b))
-	return b, nil
-
+	return walletInfoRes, nil
 }
 
 func chooseKnownAssets(b rpc.BalanceMap) {
@@ -156,49 +157,21 @@ func chooseKnownAssets(b rpc.BalanceMap) {
 	return
 }
 
-func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
+func doOffer(userOfferRequest UserOfferRequest) (UserOfferResponse, error) {
 	userOfferResponse := make(UserOfferResponse)
-	var quotation quotation
+	var quot quotation
 
-	tmp, ok := reqParam["asset"]
-	if !ok {
-		err := fmt.Errorf("no offer asset label found")
-		logger.Println("error:", err)
-		return nil, err
-	}
-
-	if len(tmp) != 1 {
-		err := fmt.Errorf("offer must be a single record but has:%d", len(tmp))
-		logger.Println("error:", err)
-		return nil, err
-	}
-	requestAsset := tmp[0]
-
-	tmp, ok = reqParam["cost"]
-	if !ok {
-		err := fmt.Errorf("no offer asset amount found")
-		logger.Println("error:", err)
-		return nil, err
-	}
-	if len(tmp) != 1 {
-		err := fmt.Errorf("cost must be a single record but has:%d", len(tmp))
-		logger.Println("error:", err)
-		return nil, err
-	}
-	requestAmount, err := strconv.ParseInt(tmp[0], 10, 64)
-	if err != nil {
-		logger.Println("error:", err)
-		return nil, err
-	}
+	requestAsset := userOfferRequest.Asset
+	requestAmount := userOfferRequest.Cost
 
 	balance, err := getMyBalance()
 	if err != nil {
 		logger.Println("error:", err)
 		return nil, err
 	}
-	quotation.RequestAsset = requestAsset
-	quotation.RequestAmount = requestAmount
-	quotation.Offer = make(map[string]UserOfferResByAsset)
+	quot.RequestAsset = requestAsset
+	quot.RequestAmount = requestAmount
+	quot.Offer = make(map[string]UserOfferResByAsset)
 	offerExists := false
 	for offerAsset := range balance {
 		if offerAsset == requestAsset {
@@ -216,19 +189,13 @@ func doOffer(reqParam url.Values, reqBody string) ([]byte, error) {
 			Transaction: "",
 		}
 		userOfferResponse[offerAsset] = offerByAsset
-		quotation.Offer[offerAsset] = offerByAsset
+		quot.Offer[offerAsset] = offerByAsset
 	}
 	if offerExists {
-		quotationList[quotation.getID()] = quotation
-	}
-	b, err := json.Marshal(userOfferResponse)
-	if err != nil {
-		logger.Println("json#Marshal error:", err)
-		return nil, err
+		quotationList[quot.getID()] = quot
 	}
 
-	logger.Println("<<" + string(b))
-	return b, nil
+	return userOfferResponse, nil
 }
 
 func appendTransactionInfo(sendToAddr string, sendAsset string, sendAmount int64, offerAsset string, offerDetail UserOfferResByAsset, utxos rpc.UnspentList) (string, error) {
@@ -323,52 +290,24 @@ func appendTransactionInfoWB(sendToAddr string, sendAsset string, sendAmount int
 	return txTemplate, nil
 }
 
-func doSend(reqParam url.Values, reqBody string) ([]byte, error) {
-	tmp, ok := reqParam["id"]
-	if !ok {
-		err := fmt.Errorf("no id found")
-		logger.Println("error:", err)
-		return nil, err
-	}
+func doSend(reqForm UserSendRequest) (UserSendResponse, error) {
+	var userSendResponse UserSendResponse
 
-	if len(tmp) != 1 {
-		err := fmt.Errorf("id must be a single record but has:%d", len(tmp))
-		logger.Println("error:", err)
-		return nil, err
-	}
-	offerID := tmp[0]
-
-	tmp, ok = reqParam["addr"]
-	if !ok {
-		err := fmt.Errorf("no addr found")
-		logger.Println("error:", err)
-		return nil, err
-	}
-
-	if len(tmp) != 1 {
-		err := fmt.Errorf("addr must be a single record but has:%d", len(tmp))
-		logger.Println("error:", err)
-		return nil, err
-	}
-
-	isConfidential, err := isConfidential(tmp[0])
+	offerID := reqForm.ID
+	sendToAddr := reqForm.Addr
+	isConfidential, err := isConfidential(sendToAddr)
 	if err != nil {
 		logger.Println("error:", err)
-		return nil, err
+		return userSendResponse, err
 	}
 
-	sendToAddr := tmp[0]
-
-	var userSendResponse UserSendResponse
 	if isConfidential {
 		userSendResponse, err = doSendWithBlinding(offerID, sendToAddr)
 	} else {
 		userSendResponse, err = doSendWithNoBlinding(offerID, sendToAddr)
 	}
 
-	b, _ := json.Marshal(userSendResponse)
-	logger.Println("<<" + string(b))
-	return b, err
+	return userSendResponse, err
 }
 
 func doSendWithBlinding(offerID string, sendToAddr string) (UserSendResponse, error) {
@@ -410,7 +349,7 @@ func doSendWithBlinding(offerID string, sendToAddr string) (UserSendResponse, er
 
 	if (offerDetail.Cost != exchangeOffer.Cost) ||
 		(offerDetail.Fee != exchangeOffer.Fee) {
-		err := fmt.Errorf("quatation has changed: old (cost:%d, fee:%d) => new (cost:%d, fee:%d)",
+		err = fmt.Errorf("quotation has changed: old (cost:%d, fee:%d) => new (cost:%d, fee:%d)",
 			offerDetail.Cost, offerDetail.Fee, exchangeOffer.Cost, exchangeOffer.Fee)
 		logger.Println("error:", err)
 		return userSendResponse, err
@@ -444,7 +383,7 @@ func doSendWithBlinding(offerID string, sendToAddr string) (UserSendResponse, er
 		userSendResponse.Message = fmt.Sprintf("fail ADDR:%s TxID:%s\nerr:%#v", sendToAddr, offerID, err)
 	} else {
 		userSendResponse.Result = true
-		userSendResponse.Message = fmt.Sprintf("success ADDR:%s TxID:%s ", sendToAddr, submitRes.TransactionId)
+		userSendResponse.Message = fmt.Sprintf("success ADDR:%s TxID:%s", sendToAddr, submitRes.TransactionID)
 	}
 
 	delete(quotationList, quotationID)
@@ -475,7 +414,7 @@ func doSendWithNoBlinding(offerID string, sendToAddr string) (UserSendResponse, 
 
 	if (offerDetail.Cost != exchangeOffer.Cost) ||
 		(offerDetail.Fee != exchangeOffer.Fee) {
-		err := fmt.Errorf("quatation has changed: old (cost:%d, fee:%d) => new (cost:%d, fee:%d)",
+		err = fmt.Errorf("quotation has changed: old (cost:%d, fee:%d) => new (cost:%d, fee:%d)",
 			offerDetail.Cost, offerDetail.Fee, exchangeOffer.Cost, exchangeOffer.Fee)
 		logger.Println("error:", err)
 		return userSendResponse, err
@@ -508,7 +447,7 @@ func doSendWithNoBlinding(offerID string, sendToAddr string) (UserSendResponse, 
 		userSendResponse.Message = fmt.Sprintf("fail ADDR:%s TxID:%s\nerr:%#v", sendToAddr, offerID, err)
 	} else {
 		userSendResponse.Result = true
-		userSendResponse.Message = fmt.Sprintf("success ADDR:%s TxID:%s ", sendToAddr, submitRes.TransactionId)
+		userSendResponse.Message = fmt.Sprintf("success ADDR:%s TxID:%s", sendToAddr, submitRes.TransactionID)
 	}
 
 	delete(quotationList, quotationID)
@@ -562,7 +501,7 @@ func isConfidential(addr string) (bool, error) {
 		return false, err
 	}
 
-	if validAddr.IsValid == false {
+	if !validAddr.IsValid {
 		return false, fmt.Errorf("invalid address [%s]", addr)
 	}
 
@@ -641,6 +580,7 @@ func callExchangerAPI(targetURL string, param interface{}, result interface{}) (
 	client := &http.Client{}
 	reqBody := string(encodedRequest)
 	req, err := http.NewRequest("POST", targetURL, bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "text/plain")
 	fmt.Println(req)
 	if err != nil {
 		logger.Println("http#NewRequest error", err)
@@ -653,16 +593,17 @@ func callExchangerAPI(targetURL string, param interface{}, result interface{}) (
 		return nil, err
 	}
 	body, err := ioutil.ReadAll(res.Body)
-	defer res.Body.Close()
+	defer func() {
+		e := res.Body.Close()
+		logger.Println("error:", e)
+	}()
 	if err != nil {
 		logger.Println("ioutil#ReadAll error:", err)
 		return res, err
 	}
 	err = json.Unmarshal(body, result)
-	if err != nil {
-		return res, err
-	}
-	return res, nil
+
+	return res, err
 }
 
 func initialize() {
@@ -694,13 +635,20 @@ func initialize() {
 func main() {
 	initialize()
 
-	dir, _ := os.Getwd()
-	listener, err := lib.StartHttpServer(localAddr, handlerList, dir+"/html/"+myActorName)
-	defer listener.Close()
+	dir, err := os.Getwd()
 	if err != nil {
 		logger.Println("error:", err)
 		return
 	}
+	listener, err := lib.StartHTTPServer(localAddr, handlerList, dir+"/html/"+myActorName)
+	if err != nil {
+		logger.Println("error:", err)
+		return
+	}
+	defer func() {
+		e := listener.Close()
+		logger.Println("error:", e)
+	}()
 
 	// signal handling (ctrl + c)
 	sig := make(chan os.Signal)
