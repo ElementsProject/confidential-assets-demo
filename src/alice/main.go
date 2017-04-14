@@ -581,13 +581,13 @@ func callExchangerAPI(targetURL string, param interface{}, result interface{}) (
 	reqBody := string(encodedRequest)
 	req, err := http.NewRequest("POST", targetURL, bytes.NewBufferString(reqBody))
 	req.Header.Set("Content-Type", "text/plain")
-	fmt.Println(req)
+	logger.Println(req)
 	if err != nil {
 		logger.Println("http#NewRequest error", err)
 		return nil, err
 	}
 	res, err := client.Do(req)
-	fmt.Println(res)
+	logger.Println(res)
 	if err != nil {
 		logger.Println("http.Client#Do error:", err)
 		return nil, err
@@ -595,7 +595,9 @@ func callExchangerAPI(targetURL string, param interface{}, result interface{}) (
 	body, err := ioutil.ReadAll(res.Body)
 	defer func() {
 		e := res.Body.Close()
-		logger.Println("error:", e)
+		if e != nil {
+			logger.Println("error:", e)
+		}
 	}()
 	if err != nil {
 		logger.Println("ioutil#ReadAll error:", err)
@@ -647,7 +649,9 @@ func main() {
 	}
 	defer func() {
 		e := listener.Close()
-		logger.Println("error:", e)
+		if e != nil {
+			logger.Println("error:", e)
+		}
 	}()
 
 	// signal handling (ctrl + c)
