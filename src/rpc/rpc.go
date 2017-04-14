@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-// rpc
+// Package rpc is a simple client
 package rpc
 
 import (
@@ -14,6 +14,7 @@ import (
 	"time"
 )
 
+// ValidatedAddress contains address details.
 type ValidatedAddress struct {
 	IsValid         bool   `json:"isvalid"`          // : true|false,        (boolean) If the address is valid or not. If not, this is the only property returned.
 	Address         string `json:"address"`          // : "bitcoinaddress", (string) The bitcoin address validated
@@ -31,6 +32,7 @@ type ValidatedAddress struct {
 	Hdmasterkeyid   string `json:"hdmasterkeyid"`    // : "<hash160>" (string, optional) The Hash160 of the HD master pubkey
 }
 
+// Unspent contains unspent details.
 type Unspent struct {
 	Txid            string `json:"txid"`            // "txid"            : "txid",    (string)  the transaction id
 	Vout            int64  `json:"vout"`            // "vout"            : n,         (numeric) the vout value
@@ -48,10 +50,13 @@ type Unspent struct {
 	Solvable        bool   `json:"solvable"`        // "solvable"        : xxx        (bool)    Whether we know how to spend this output, ignoring the lack of keys
 }
 
+// UnspentList is an array of unspent outputs.
 type UnspentList []*Unspent
 
+// BalanceMap is a map where the key is an assetid and the value is a balance.
 type BalanceMap map[string]float64
 
+// Wallet is wallet details.
 type Wallet struct {
 	WalletVersion      int64      `json:"walletversion"`       // : xxxxx,       (numeric) the wallet version
 	Balance            BalanceMap `json:"balance"`             // : xxxxxxx,     (numeric) the total confirmed balance of the wallet in BTC
@@ -65,11 +70,13 @@ type Wallet struct {
 	HDMasterKeyId      string     `json:"hdmasterkeyid"`       // : "<hash160>", (string) the Hash160 of the HD master pubkey
 }
 
+// ScriptSig is script details.
 type ScriptSig struct {
 	Asm string `json:"asm"`
 	Hex string `json:"hex"`
 }
 
+// ScriptPubKey is pubkey details.
 type ScriptPubKey struct {
 	Asm       string   `json:"asm"`
 	Hex       string   `json:"hex"`
@@ -78,6 +85,7 @@ type ScriptPubKey struct {
 	Addresses []string `json:"addresses"`
 }
 
+// Vin is input details.
 type Vin struct {
 	Txid        string    `json:"txid"`
 	Vout        int64     `json:"vout"`
@@ -86,6 +94,7 @@ type Vin struct {
 	sequence    int64     `json:"sequence"`
 }
 
+// Vout is output details.
 type Vout struct {
 	Value        float64      `json:"value"`
 	N            int64        `json:"n"`
@@ -94,6 +103,7 @@ type Vout struct {
 	ScriptPubKey ScriptPubKey `json:"scriptPubKey"`
 }
 
+// RawTransaction is transaction details.
 type RawTransaction struct {
 	Txid     string  `json:"txid"`
 	Hash     string  `json:"hash"`
@@ -106,11 +116,13 @@ type RawTransaction struct {
 	Vout     []Vout  `json:"vout"`
 }
 
+// SignedTransaction is transaction details.
 type SignedTransaction struct {
 	Hex      string `json:"hex"`
 	Complete bool   `json:"complete"`
 }
 
+// Rpc is request info.
 type Rpc struct {
 	Url  string
 	User string
@@ -118,6 +130,7 @@ type Rpc struct {
 	View bool
 }
 
+// RpcRequest is request parameters.
 type RpcRequest struct {
 	Jsonrpc string        `json:"jsonrpc,"`
 	Id      string        `json:"id,"`
@@ -125,17 +138,20 @@ type RpcRequest struct {
 	Params  []interface{} `json:"params,"`
 }
 
+// RpcResponse is response details.
 type RpcResponse struct {
 	Result interface{} `json:"result,"`
 	Error  interface{} `json:"error,"`
 	Id     string      `json:"id,"`
 }
 
+// RpcError is error details.
 type RpcError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
+// UnmarshalError converts the error response into an RpcError type
 func (res *RpcResponse) UnmarshalError() (RpcError, error) {
 	var rerr RpcError
 	if res.Error == nil {
@@ -150,6 +166,7 @@ func (res *RpcResponse) UnmarshalError() (RpcError, error) {
 	return rerr, nil
 }
 
+// UnmarshalResult converts the response into an result type
 func (res *RpcResponse) UnmarshalResult(result interface{}) error {
 	if res.Result == nil {
 		return fmt.Errorf("RpcResponse Result is nil.")
@@ -160,9 +177,8 @@ func (res *RpcResponse) UnmarshalResult(result interface{}) error {
 		arr, ok := res.Result.([]interface{})
 		if !ok {
 			return fmt.Errorf("RpcResponse Result is neither map[string]interface{} nor []interface{}")
-		} else {
-			bs, _ = json.Marshal(arr)
 		}
+		bs, _ = json.Marshal(arr)
 	} else {
 		bs, _ = json.Marshal(m)
 	}
@@ -173,6 +189,7 @@ func (res *RpcResponse) UnmarshalResult(result interface{}) error {
 	return nil
 }
 
+// NewRpc return new Rpc
 func NewRpc(url, user, pass string) *Rpc {
 	rpc := new(Rpc)
 	rpc.Url = url
@@ -181,6 +198,7 @@ func NewRpc(url, user, pass string) *Rpc {
 	return rpc
 }
 
+// Request request server
 func (rpc *Rpc) Request(method string, params ...interface{}) (RpcResponse, error) {
 	var res RpcResponse
 	if len(params) == 0 {
@@ -211,6 +229,7 @@ func (rpc *Rpc) Request(method string, params ...interface{}) (RpcResponse, erro
 	return res, nil
 }
 
+// RequestAndUnmarshalResult do Request and UnmarshalResult
 func (rpc *Rpc) RequestAndUnmarshalResult(result interface{}, method string, params ...interface{}) (RpcResponse, error) {
 	res, err := rpc.Request(method, params...)
 	if err != nil {
@@ -223,6 +242,7 @@ func (rpc *Rpc) RequestAndUnmarshalResult(result interface{}, method string, par
 	return res, nil
 }
 
+// RequestAndCastNumber do Request and cast float64
 func (rpc *Rpc) RequestAndCastNumber(method string, params ...interface{}) (float64, RpcResponse, error) {
 	var num float64
 	res, err := rpc.Request(method, params...)
@@ -236,6 +256,7 @@ func (rpc *Rpc) RequestAndCastNumber(method string, params ...interface{}) (floa
 	return num, res, nil
 }
 
+// RequestAndCastString do Request and cast string
 func (rpc *Rpc) RequestAndCastString(method string, params ...interface{}) (string, RpcResponse, error) {
 	var str string
 	res, err := rpc.Request(method, params...)
@@ -249,6 +270,7 @@ func (rpc *Rpc) RequestAndCastString(method string, params ...interface{}) (stri
 	return str, res, nil
 }
 
+// RequestAndCastBool do Request and cast bool
 func (rpc *Rpc) RequestAndCastBool(method string, params ...interface{}) (bool, RpcResponse, error) {
 	var b bool
 	res, err := rpc.Request(method, params...)

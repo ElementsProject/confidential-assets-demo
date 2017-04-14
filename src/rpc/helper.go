@@ -2,9 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-/**
- * Helper functions for the RPC utility
- */
+// Package rpc Helper functions for the RPC utility
 package rpc
 
 import (
@@ -13,12 +11,12 @@ import (
 	"time"
 )
 
-// Lock lists to keep referenced utxos (potentially to-be-spent)
-
+// LockList to keep referenced utxos (potentially to-be-spent)
 type LockList map[string]time.Time
 
 var utxoLockDuration time.Duration
 
+// SetUtxoLockDuration set utxoLockDuration
 func SetUtxoLockDuration(utxoLockDurationIn time.Duration) {
 	utxoLockDuration = utxoLockDurationIn
 }
@@ -41,8 +39,9 @@ func (ul UnspentList) Less(i, j int) bool {
 	return (*ul[i]).Confirmations < (*ul[j]).Confirmations
 }
 
+// GetAmount get total amount.
 func (ul UnspentList) GetAmount() int64 {
-	var totalAmount int64 = 0
+	var totalAmount = int64(0)
 
 	for _, u := range ul {
 		totalAmount += u.Amount
@@ -55,6 +54,7 @@ func getLockingKey(txid string, vout int64) string {
 	return fmt.Sprintf("%s:%d", txid, vout)
 }
 
+// Lock lock utxo.
 func (ll LockList) Lock(txid string, vout int64) bool {
 	key := getLockingKey(txid, vout)
 	now := time.Now()
@@ -76,6 +76,7 @@ func (ll LockList) Lock(txid string, vout int64) bool {
 	return false
 }
 
+// Unlock unlock utxo.
 func (ll LockList) Unlock(txid string, vout int64) {
 	key := getLockingKey(txid, vout)
 	delete(ll, key)
@@ -83,6 +84,7 @@ func (ll LockList) Unlock(txid string, vout int64) {
 	return
 }
 
+// Sweep delete timeout
 func (ll LockList) Sweep() {
 	now := time.Now()
 	for k, v := range ll {
@@ -92,12 +94,14 @@ func (ll LockList) Sweep() {
 	}
 }
 
+// UnlockUnspentList unlock utxos.
 func (ll LockList) UnlockUnspentList(ul UnspentList) {
 	for _, u := range ul {
 		ll.Unlock(u.Txid, u.Vout)
 	}
 }
 
+// GetNewAddr get new address, confidential or normal.
 func (rpc *Rpc) GetNewAddr(confidential bool) (string, error) {
 	var validAddr ValidatedAddress
 
@@ -122,12 +126,10 @@ func (rpc *Rpc) GetNewAddr(confidential bool) (string, error) {
 	return validAddr.Unconfidential, nil
 }
 
-/**
- * Extract the commitments from a list of UTXOs and return these
- * as an array of hex strings.
- */
+// GetCommitments : Extract the commitments from a list of UTXOs and return these
+// as an array of hex strings.
 func (rpc *Rpc) GetCommitments(utxos UnspentList) ([]string, error) {
-	var commitments []string = make([]string, len(utxos))
+	var commitments = make([]string, len(utxos))
 
 	for i, u := range utxos {
 		commitments[i] = u.AssetCommitment
@@ -135,10 +137,11 @@ func (rpc *Rpc) GetCommitments(utxos UnspentList) ([]string, error) {
 	return commitments, nil
 }
 
+// SearchUnspent search unspent utxo.
 func (rpc *Rpc) SearchUnspent(lockList LockList, requestAsset string, requestAmount int64, blinding bool) (UnspentList, error) {
-	var totalAmount int64 = 0
+	var totalAmount = int64(0)
 	var ul UnspentList
-	var utxos UnspentList = make(UnspentList, 0)
+	var utxos = make(UnspentList, 0)
 
 	_, err := rpc.RequestAndUnmarshalResult(&ul, "listunspent", 1, 9999999, []string{}, requestAsset)
 	if err != nil {
@@ -175,6 +178,7 @@ func (rpc *Rpc) SearchUnspent(lockList LockList, requestAsset string, requestAmo
 	return utxos, nil
 }
 
+// SearchMinimalUnspent search unspent minimal utxo.
 func (rpc *Rpc) SearchMinimalUnspent(lockList LockList, requestAsset string, blinding bool) (UnspentList, error) {
 	var ul UnspentList
 	var utxos UnspentList
@@ -190,8 +194,8 @@ func (rpc *Rpc) SearchMinimalUnspent(lockList LockList, requestAsset string, bli
 	}
 
 	sort.Sort(ul)
-	var start int = 0
-	var found bool = false
+	var start = 0
+	var found = false
 	for i, u := range ul {
 		if blinding && (u.AssetCommitment == "") {
 			continue
