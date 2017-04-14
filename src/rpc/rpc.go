@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-// Package rpc is simple cilent
+// Package rpc is a simple client
 package rpc
 
 import (
@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// ValidatedAddress is address details.
+// ValidatedAddress contains address details.
 type ValidatedAddress struct {
 	IsValid         bool   `json:"isvalid"`          // : true|false,        (boolean) If the address is valid or not. If not, this is the only property returned.
 	Address         string `json:"address"`          // : "bitcoinaddress", (string) The bitcoin address validated
@@ -32,7 +32,7 @@ type ValidatedAddress struct {
 	Hdmasterkeyid   string `json:"hdmasterkeyid"`    // : "<hash160>" (string, optional) The Hash160 of the HD master pubkey
 }
 
-// Unspent is unspent details.
+// Unspent contains unspent details.
 type Unspent struct {
 	Txid            string `json:"txid"`            // "txid"            : "txid",    (string)  the transaction id
 	Vout            int64  `json:"vout"`            // "vout"            : n,         (numeric) the vout value
@@ -50,10 +50,10 @@ type Unspent struct {
 	Solvable        bool   `json:"solvable"`        // "solvable"        : xxx        (bool)    Whether we know how to spend this output, ignoring the lack of keys
 }
 
-// UnspentList is Unspent array.
+// UnspentList is an array of unspent outputs.
 type UnspentList []*Unspent
 
-// BalanceMap is map. key is assetid. value is balance.
+// BalanceMap is a map where the key is an assetid and the value is a balance.
 type BalanceMap map[string]float64
 
 // Wallet is wallet details.
