@@ -22,21 +22,6 @@ type Block struct {
 	Tx []string `json:"tx,"`
 }
 
-// Transaction with Outputs
-type Transaction struct {
-	Vout []Output `json:"vout,"`
-}
-
-// Output format
-type Output struct {
-	Value        float64                `json:"value,"`
-	Fee          float64                `json:"fee_value,"`
-	Assetid      string                 `json:"assetid,"`
-	Assettag     string                 `json:"assettag,"`
-	N            int                    `json:"n,"`
-	ScriptPubKey map[string]interface{} `json:"scriptPubKey,"`
-}
-
 const interval = 3 * time.Second
 
 var rpcurl = "http://127.0.0.1:10010"
@@ -80,21 +65,21 @@ func viewBlock(height int) error {
 
 func printtxouts(txid string) error {
 	fmt.Println("TXID:", txid)
-	var tx Transaction
+	var tx rpc.RawTransaction
 	res, err := rpcClient.RequestAndUnmarshalResult(&tx, "getrawtransaction", txid, 1)
 	if err != nil {
 		logger.Printf("Rpc#RequestAndUnmarshalResult error:%v res:%+v", err, res)
 		return err
 	}
-	format := "[%d] Value: %v Asset: %v -> %v\n"
+	format := "[%d] Value: %3v Asset: %7v -> %v\n"
 	for _, out := range tx.Vout {
-		if out.Assetid == "" {
-			fmt.Printf(format, out.N, "???", "???", out.ScriptPubKey["addresses"])
+		if out.Asset == "" {
+			fmt.Printf(format, out.N, "???", "???????", out.ScriptPubKey.Addresses)
 		} else {
-			if out.Value == 0 {
-				fmt.Printf(format, out.N, out.Fee, assets[out.Assetid], "fee")
+			if out.ScriptPubKey.Type == "fee" {
+				fmt.Printf(format, out.N, out.Value, assets[out.Asset], "fee")
 			} else {
-				fmt.Printf(format, out.N, out.Value, assets[out.Assetid], out.ScriptPubKey["addresses"])
+				fmt.Printf(format, out.N, out.Value, assets[out.Asset], out.ScriptPubKey.Addresses)
 			}
 		}
 	}
