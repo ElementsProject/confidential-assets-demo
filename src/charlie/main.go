@@ -11,11 +11,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"os/signal"
 	"rpc"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -57,8 +55,6 @@ var handlerList = map[string]interface{}{
 	"/getexchangeoffer/":   doOffer,
 	"/submitexchange/":     doSubmit,
 }
-
-var cyclics = []lib.CyclicProcess{lib.CyclicProcess{Handler: lockList.Sweep, Interval: 3}}
 
 func doGetRate(rateRequest lib.ExchangeRateRequest) (lib.ExchangeRateResponse, error) {
 	var rateRes lib.ExchangeRateResponse
@@ -421,18 +417,11 @@ func main() {
 		}
 	}()
 
-	// signal handling (ctrl + c)
-	sig := make(chan os.Signal)
-	stop := false
-	signal.Notify(sig, syscall.SIGINT)
-	go func() {
-		logger.Println(<-sig)
-		stop = true
-	}()
-
-	lib.StartCyclicProc(cyclics, &stop)
-
-	lib.WaitStopSignal(&stop)
+	_, err = lib.StartCyclic(lockList.Sweep, 3, true)
+	if err != nil {
+		logger.Println("error:", err)
+		return
+	}
 
 	logger.Println(myActorName + " stop")
 }
