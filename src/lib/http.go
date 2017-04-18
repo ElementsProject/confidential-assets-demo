@@ -111,12 +111,6 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
-// CyclicProcess is a structure that holds function and its calling interval.
-type CyclicProcess struct {
-	Handler  func()
-	Interval int
-}
-
 var logger *log.Logger
 
 // SetLogger sets logger.
@@ -360,31 +354,4 @@ func StartHTTPServer(laddr string, handlers map[string]interface{}, filepath str
 	}()
 
 	return listener, err
-}
-
-// StartCyclicProc calls each function with each interval.
-func StartCyclicProc(cps []CyclicProcess, stop *bool) {
-	for _, cyclic := range cps {
-		c := cyclic
-		go func() {
-			logger.Println("Loop interval:", c.Interval)
-			for {
-				time.Sleep(time.Duration(c.Interval) * time.Second)
-				if *stop {
-					break
-				}
-				c.Handler()
-			}
-		}()
-	}
-}
-
-// WaitStopSignal waits stop flag to be true.
-func WaitStopSignal(stop *bool) {
-	for {
-		time.Sleep(1 * time.Second)
-		if *stop {
-			break
-		}
-	}
 }
