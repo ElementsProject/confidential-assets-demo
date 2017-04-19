@@ -12,7 +12,7 @@ if [ -e ./demo.tmp ]; then
             kill -SIGINT $pid
         fi
     done
-    sleep 3
+    sleep 1
     for pid in "${gopids[@]}"; do
         if ps -p $pid > /dev/null ; then
             echo "kill -9 $pid"
