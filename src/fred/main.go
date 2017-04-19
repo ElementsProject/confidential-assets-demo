@@ -9,11 +9,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"democonf"
+	"lib"
 	"rpc"
 )
 
@@ -28,11 +26,7 @@ var rpcpass = "pass"
 
 var rpcClient *rpc.Rpc
 
-var interval = 3 * time.Second
-
 var logger *log.Logger
-
-var stop = false
 
 func checkgenerate() error {
 	var txs []string
@@ -55,17 +49,10 @@ func checkgenerate() error {
 	return nil
 }
 
-func loop() {
-	fmt.Println("Loop interval:", interval)
-	for {
-		time.Sleep(interval)
-		err := checkgenerate()
-		if err != nil {
-			logger.Println("checkgenarate error:", err)
-		}
-		if stop {
-			break
-		}
+func callback() {
+	err := checkgenerate()
+	if err != nil {
+		logger.Println("checkgenarate error:", err)
 	}
 }
 
@@ -83,15 +70,8 @@ func main() {
 	loadConf()
 	rpcClient = rpc.NewRpc(rpcurl, rpcuser, rpcpass)
 
-	// signal handling (ctrl + c)
-	sig := make(chan os.Signal)
-	signal.Notify(sig, syscall.SIGINT)
-	go func() {
-		fmt.Println("signal:", <-sig)
-		stop = true
-	}()
-
-	loop()
+	lib.SetLogger(logger)
+	lib.StartCyclic(callback, 3, true)
 
 	fmt.Println("Fred stop")
 }
