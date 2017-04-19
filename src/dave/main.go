@@ -13,12 +13,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"democonf"
+	"lib"
 	"rpc"
 )
 
@@ -38,8 +37,6 @@ var laddr = ":8030"
 var confidential = false
 
 var rpcClient *rpc.Rpc
-
-var interval = 3 * time.Second
 
 // Item details
 type Item struct {
@@ -67,36 +64,27 @@ var list = []*Order{}
 
 var logger *log.Logger
 
-var stop = false
-
-func loop() {
-	fmt.Println("Loop interval:", interval)
-	for {
-		time.Sleep(interval)
-		if stop {
-			break
+func callback() {
+	for _, order := range list {
+		if order.Status != 0 {
+			continue
 		}
-		for _, order := range list {
-			if order.Status != 0 {
-				continue
-			}
-			now := time.Now().Unix()
-			if order.Timeout <= now {
-				fmt.Println("Timeout!", order.Addr)
-				order.Status = -1
-				order.LastModify = now
-				continue
-			}
-			amount, res, err := rpcClient.RequestAndCastNumber("getreceivedbyaddress", order.Addr, 1, order.Asset)
-			if err != nil {
-				logger.Printf("Rpc#RequestAndCastNumber error:%v res:%+v", err, res)
-				continue
-			}
-			if amount >= order.Price {
-				fmt.Println("Paid!", order.Addr)
-				order.Status = 1
-				order.LastModify = now
-			}
+		now := time.Now().Unix()
+		if order.Timeout <= now {
+			fmt.Println("Timeout!", order.Addr)
+			order.Status = -1
+			order.LastModify = now
+			continue
+		}
+		amount, res, err := rpcClient.RequestAndCastNumber("getreceivedbyaddress", order.Addr, 1, order.Asset)
+		if err != nil {
+			logger.Printf("Rpc#RequestAndCastNumber error:%v res:%+v", err, res)
+			continue
+		}
+		if amount >= order.Price {
+			fmt.Println("Paid!", order.Addr)
+			order.Status = 1
+			order.LastModify = now
 		}
 	}
 }
@@ -191,15 +179,8 @@ func main() {
 	fmt.Println("start listening...", listener.Addr().Network(), listener.Addr())
 	go http.Serve(listener, mux)
 
-	// signal handling (ctrl + c)
-	sig := make(chan os.Signal)
-	signal.Notify(sig, syscall.SIGINT)
-	go func() {
-		fmt.Println(<-sig)
-		stop = true
-	}()
-
-	loop()
+	lib.SetLogger(logger)
+	lib.StartCyclic(callback, 3, true)
 
 	fmt.Println("Dave stopping")
 }
