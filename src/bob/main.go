@@ -9,11 +9,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"democonf"
+	"lib"
 	"rpc"
 )
 
@@ -21,8 +19,6 @@ import (
 type Block struct {
 	Tx []string `json:"tx,"`
 }
-
-const interval = 3 * time.Second
 
 var rpcurl = "http://127.0.0.1:10010"
 var rpcuser = "user"
@@ -34,7 +30,7 @@ var assets = make(map[string]string)
 
 var logger *log.Logger
 
-var stop = false
+var blockcount = -1
 
 func getblockcount() (int, error) {
 	blockcount, res, err := rpcClient.RequestAndCastNumber("getblockcount")
@@ -99,29 +95,21 @@ func getassetlabels() error {
 	return nil
 }
 
-func loop() {
-	fmt.Println("Loop interval:", interval)
-	blockcount := -1
-	for {
-		time.Sleep(interval)
-		if stop {
-			break
-		}
-		getassetlabels()
-		blockheight, err := getblockcount()
-		if err != nil {
-			logger.Println("getblockcount error:", err)
-			continue
-		}
-		if blockcount < 0 {
-			blockcount = blockheight
-			fmt.Println("Start block", blockcount)
-		} else if blockcount < blockheight {
-			for blockcount < blockheight {
-				blockcount++
-				fmt.Println("Find block", blockcount)
-				viewBlock(blockcount)
-			}
+func callback() {
+	getassetlabels()
+	blockheight, err := getblockcount()
+	if err != nil {
+		logger.Println("getblockcount error:", err)
+		return
+	}
+	if blockcount < 0 {
+		blockcount = blockheight
+		fmt.Println("Start block", blockcount)
+	} else if blockcount < blockheight {
+		for blockcount < blockheight {
+			blockcount++
+			fmt.Println("Find block", blockcount)
+			viewBlock(blockcount)
 		}
 	}
 }
@@ -140,14 +128,8 @@ func main() {
 	loadConf()
 	rpcClient = rpc.NewRpc(rpcurl, rpcuser, rpcpass)
 
-	// signal handling (ctrl + c)
-	sig := make(chan os.Signal)
-	signal.Notify(sig, syscall.SIGINT)
-	go func() {
-		fmt.Println(<-sig)
-		stop = true
-	}()
+	lib.SetLogger(logger)
+	lib.StartCyclic(callback, 3, true)
 
-	loop()
 	fmt.Println("Bob stopping")
 }
