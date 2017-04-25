@@ -65,15 +65,20 @@ var list = []*Order{}
 var logger *log.Logger
 
 func callback() {
+	newlist := []*Order{}
+	now := time.Now()
+	old := now.AddDate(0, 0, -1)
 	for _, order := range list {
+		if order.LastModify > old.Unix() {
+			newlist = append(newlist, order)
+		}
 		if order.Status != 0 {
 			continue
 		}
-		now := time.Now().Unix()
-		if order.Timeout <= now {
+		if order.Timeout <= now.Unix() {
 			fmt.Println("Timeout!", order.Addr)
 			order.Status = -1
-			order.LastModify = now
+			order.LastModify = now.Unix()
 			continue
 		}
 		amount, res, err := rpcClient.RequestAndCastNumber("getreceivedbyaddress", order.Addr, 1, order.Asset)
@@ -84,9 +89,10 @@ func callback() {
 		if amount >= order.Price {
 			fmt.Println("Paid!", order.Addr)
 			order.Status = 1
-			order.LastModify = now
+			order.LastModify = now.Unix()
 		}
 	}
+	list = newlist
 }
 
 func orderhandler(w http.ResponseWriter, r *http.Request) {
