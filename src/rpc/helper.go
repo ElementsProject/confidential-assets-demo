@@ -212,6 +212,7 @@ func (rpc *Rpc) SearchMinimalUnspent(lockList LockList, requestAsset string, bli
 
 		start = i
 		found = true
+		break
 	}
 	if !found {
 		err := fmt.Errorf("no utxo [%s]", requestAsset)
