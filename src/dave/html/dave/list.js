@@ -10,7 +10,7 @@ function list() {
             for (order of data.result) {
                 let tr = $("<tr>");
                 let item = $("<td>").text(order.Item);
-                let addr = $("<td>").text(order.Addr);
+                let addr = $("<td>").attr("title", order.Addr).text(shortAddr(order.Addr));
                 let price = $("<td>").text(order.Price);
                 let asset = $("<td>").text(order.Asset);
                 let status = $("<td>").text(getStatus(order.Status));
@@ -23,6 +23,14 @@ function list() {
         }
     });
     setTimeout(list, 3000);
+}
+
+function shortAddr(addr) {
+	let ret = addr;
+	if (ret.length > 20) {
+		ret = ret.slice(0, 10) + " ... " + ret.slice(ret.length - 10);
+	}
+	return ret;
 }
 
 function getStatus(status) {
