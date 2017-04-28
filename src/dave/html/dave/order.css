@@ -160,13 +160,13 @@ body {
 }
 
 #qrbase .qrtext {
-    font-size: 13pt;
+    font-size: 12pt;
     font-weight: bold;
     padding-top: 15px;
 }
 
 #qrcode {
-    padding-top: 30px;
+    padding-top: 0px;
     padding-bottom: 30px;
     cursor: pointer;
 }
@@ -219,7 +219,7 @@ body {
 
 #uri {
     width: 1px;
-    height: 1px;
+    height: 20px;
     border: none;
 }
 
