@@ -42,7 +42,10 @@ function reset() {
 }
 
 function copyUri() {
-    document.getElementById("uri").select();
+    var uri = document.getElementById("uri");
+    uri.select();
+    uri.selectionStart = 0;
+    uri.selectEnd = uri.value.length;
     document.execCommand("copy");
     $("#message").fadeIn('slow').delay(1000).fadeOut('slow');
 }
