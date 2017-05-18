@@ -141,7 +141,7 @@ func doOfferWithBlinding(offerRequest lib.ExchangeOfferWBRequest) (lib.ExchangeO
 	}
 	commitments = append(resCommitments, commitments...)
 
-	blindtx, _, err := rpcClient.RequestAndCastString("blindrawtransaction", tx, commitments)
+	blindtx, _, err := rpcClient.RequestAndCastString("blindrawtransaction", tx, true, commitments)
 	if err != nil {
 		logger.Println("RPC/blindrawtransaction error:", err, tx)
 		return offerWBRes, err

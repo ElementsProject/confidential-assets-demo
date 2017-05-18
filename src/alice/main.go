@@ -360,7 +360,7 @@ func doSendWithBlinding(offerID string, sendToAddr string) (UserSendResponse, er
 		return userSendResponse, err
 	}
 
-	blindtx, _, err := rpcClient.RequestAndCastString("blindrawtransaction", tx, commitments)
+	blindtx, _, err := rpcClient.RequestAndCastString("blindrawtransaction", tx, true, commitments)
 	if err != nil {
 		logger.Println("RPC/blindrawtransaction error:", err, tx)
 		return userSendResponse, err
