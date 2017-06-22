@@ -143,7 +143,7 @@ func (rpc *Rpc) SearchUnspent(lockList LockList, requestAsset string, requestAmo
 	var ul UnspentList
 	var utxos = make(UnspentList, 0)
 
-	_, err := rpc.RequestAndUnmarshalResult(&ul, "listunspent", 1, 9999999, []string{}, requestAsset)
+	_, err := rpc.RequestAndUnmarshalResult(&ul, "listunspent", 1, 9999999, []string{}, false, requestAsset)
 	if err != nil {
 		return utxos, err
 	}
@@ -183,7 +183,7 @@ func (rpc *Rpc) SearchMinimalUnspent(lockList LockList, requestAsset string, bli
 	var ul UnspentList
 	var utxos UnspentList
 
-	_, err := rpc.RequestAndUnmarshalResult(&ul, "listunspent", 1, 9999999, []string{}, requestAsset)
+	_, err := rpc.RequestAndUnmarshalResult(&ul, "listunspent", 1, 9999999, []string{}, false, requestAsset)
 	if err != nil {
 		return utxos, err
 	}
