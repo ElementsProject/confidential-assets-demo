@@ -1,6 +1,35 @@
 #!/bin/bash
 shopt -s expand_aliases
 
+start_daemon () {
+  if [ $# -le 1 ]; then
+    echo " no nodes started."
+    return 1
+  fi
+
+  for i in ${@:2:$#-1} ; do
+    ${ELDAE} -datadir=${DEMOD}/data/${i} &
+    if [ ""${1} == "1" ]; then
+      echo "${i}_dae=$!" >> ./demo.tmp
+    fi
+  done
+
+  LDW=1
+  while [ "${LDW}" = "1" ]
+  do
+    LDW=0
+    for i in ${@:2:$#-1} ; do
+      ${ELCLI} -datadir=${DEMOD}/data/${i} getwalletinfo > /dev/null 2>&1 || LDW=1
+    done
+    if [ "${LDW}" = "1" ]; then
+      echo -n -e "."
+      sleep 1
+    fi
+  done
+  echo " nodes started."
+  return 0
+}
+
 # prepare
 ## be sure at elements-next folder
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -52,17 +81,7 @@ EOF
     echo "${i}_dir=\"-datadir=${DEMOD}/data/$i\"" >> ./demo.tmp
 done
 
-fred-dae &
-
-LDW=1
-while [ "${LDW}" = "1" ]
-do
-  LDW=0
-  fred getwalletinfo > /dev/null 2>&1 || LDW=1
-  if [ "${LDW}" = "1" ]; then
-    sleep 1
-  fi
-done
+start_daemon 0 fred
 
 echo "- generating initial blocks to reach maturity"
 
@@ -89,32 +108,9 @@ assetdir=$AIRSKY:AIRSKY
 assetdir=$MELON:MELON
 assetdir=$MONECRE:MONECRE
 EOF
-    ${ELDAE} -datadir=${DEMOD}/data/$i &
-    echo "${i}_dae=$!" >> ./demo.tmp
 done
 
-LDW=1
-while [ "${LDW}" = "1" ]
-do
-  LDW=0
-  alice getwalletinfo > /dev/null 2>&1 || LDW=1
-  bob getwalletinfo > /dev/null 2>&1 || LDW=1
-  charlie getwalletinfo > /dev/null 2>&1 || LDW=1
-  dave getwalletinfo > /dev/null 2>&1 || LDW=1
-  fred getwalletinfo > /dev/null 2>&1 || LDW=1
-  if [ "${LDW}" = "1" ]; then
-    echo -n -e "."
-    sleep 1
-  fi
-done
-
-echo " nodes started"
-
-alice addnode 127.0.0.1:10011 onetry
-bob addnode 127.0.0.1:10021 onetry
-charlie addnode 127.0.0.1:10031 onetry
-dave addnode 127.0.0.1:10041 onetry
-fred addnode 127.0.0.1:10041 onetry
+start_daemon 0 alice bob charlie dave fred
 
 ## generate assets
 fred getwalletinfo
@@ -150,6 +146,22 @@ fred generate 1
 sleep 1 # wait for sync
 echo "Charlie wallet:"
 charlie getwalletinfo
+
+## setup nodes phase 3
+alice stop
+bob stop
+charlie stop
+dave stop
+fred stop
+sleep 3
+
+for i in alice bob charlie dave fred; do
+    cat <<EOF >> ${DEMOD}/data/$i/elements.conf
+    feeasset=$AIRSKY
+EOF
+done
+
+start_daemon 1 alice bob charlie dave fred
 
 cd ${DEMOD}
 for i in alice bob charlie dave fred; do
