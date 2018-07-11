@@ -73,6 +73,7 @@ daemon=0
 listen=1
 txindex=1
 keypool=10
+initialfreecoins=2100000000000000
 EOF
     let PORT=PORT+10
     alias ${i}-dae="${ELDAE} -datadir=${DEMOD}/data/$i"
