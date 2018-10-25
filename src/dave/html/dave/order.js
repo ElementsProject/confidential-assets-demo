@@ -14,7 +14,7 @@ function order() {
     var param = {
         item: "Caramel Macchiato Coffee"
     };
-    $.getJSON("/order", param)
+    $.getJSON("order", param)
         .done(function (data) {
             if (data.result) {
                 console.log(data.uri);

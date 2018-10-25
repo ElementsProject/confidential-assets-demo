@@ -4,7 +4,7 @@ function init() {
 }
 
 function list() {
-    $.getJSON("/list", function (data) {
+    $.getJSON("list", function (data) {
         if (data.result) {
             $("#list").empty();
             for (order of data.result) {

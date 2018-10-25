@@ -1,6 +1,4 @@
 
-var url = "/";
-
 var wallets = {};
 
 var payinfo = {};
@@ -33,7 +31,7 @@ function reset() {
 }
 
 function getWalletInfo() {
-    $.getJSON(url + "walletinfo")
+    $.getJSON("walletinfo")
         .done(function (walletinfo) {
             for (let key in walletinfo.balance) {
                 if (wallets[key]) {
@@ -146,7 +144,7 @@ function setOrderInfo(name, price, asset) {
 }
 
 function getExchangeRate(asset, cost) {
-    $.getJSON(url + "offer", { asset: "" + asset, cost: "" + cost })
+    $.getJSON("offer", { asset: "" + asset, cost: "" + cost })
         .done(function (offer) {
             payinfo["offer"] = offer;
             setExchangeRate();
@@ -210,7 +208,7 @@ function okpay() {
     let id = payinfo["offer"][payinfo["exasset"]]["id"];
     let addr = payinfo["addr"];
     if (id && addr) {
-        $.getJSON(url + "send", { id: "" + id, addr: "" + addr })
+        $.getJSON("send", { id: "" + id, addr: "" + addr })
             .done(function (offer) {
                 $("#modal-thank").show();
             })
